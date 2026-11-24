@@ -24,6 +24,8 @@ def test_zipformer_recognizes_korean(model_path):
     rec = ZipformerRecognizer(model_path("zipformer-ko"))
     text = run(rec, load_wav_16k_mono(wav))
     assert HANGUL.search(text), text
+    # sherpa-onnx 1.13.x는 한글 사이 공백을 지우는 버그가 있어 토큰에서 복원한다
+    assert re.search(r"[가-힣] [가-힣]", text), text
 
 
 @pytest.mark.models

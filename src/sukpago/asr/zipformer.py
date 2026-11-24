@@ -40,7 +40,7 @@ class ZipformerRecognizer:
         self._stream.accept_waveform(SAMPLE_RATE, samples)
         while self._rec.is_ready(self._stream):
             self._rec.decode_stream(self._stream)
-        text = self._rec.get_result(self._stream).strip()
+        text = self._text()
         t = self._fed / SAMPLE_RATE
         events: list[AsrEvent] = []
         if text != self._last:
@@ -59,7 +59,13 @@ class ZipformerRecognizer:
         self._stream.input_finished()
         while self._rec.is_ready(self._stream):
             self._rec.decode_stream(self._stream)
-        text = self._rec.get_result(self._stream).strip()
+        text = self._text()
         self._stream = self._rec.create_stream()
         self._last = ""
         return [AsrEvent("final", text, self._fed / SAMPLE_RATE)] if text else []
+
+    def _text(self) -> str:
+        # sherpa-onnx 1.13.x의 get_result()는 한글 사이 공백을 지운다(issue #4128).
+        # 토큰에는 공백("▁" 또는 " ")이 남아 있으므로 토큰을 이어 붙여 복원한다.
+        tokens = self._rec.get_result_all(self._stream).tokens
+        return " ".join("".join(tokens).replace("▁", " ").split())
