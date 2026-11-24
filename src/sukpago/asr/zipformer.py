@@ -1,0 +1,65 @@
+"""스트리밍 한국어 음성 인식: kangkyu Zipformer (sherpa-onnx int8)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+
+from .base import SAMPLE_RATE, AsrEvent
+
+
+class ZipformerRecognizer:
+    name = "Zipformer"
+
+    def __init__(self, model_dir: Path, *, chunk: int = 64, num_threads: int = 2) -> None:
+        import sherpa_onnx
+
+        model_dir = Path(model_dir)
+
+        def part(kind: str) -> str:
+            return str(model_dir / f"{kind}-epoch-99-avg-1-chunk-{chunk}-left-128.int8.onnx")
+
+        self._rec = sherpa_onnx.OnlineRecognizer.from_transducer(
+            tokens=str(model_dir / "tokens.txt"),
+            encoder=part("encoder"), decoder=part("decoder"), joiner=part("joiner"),
+            num_threads=num_threads, sample_rate=SAMPLE_RATE, feature_dim=80,
+            enable_endpoint_detection=True,
+            rule1_min_trailing_silence=1.2, rule2_min_trailing_silence=0.6,
+            rule3_min_utterance_length=15.0,
+            decoding_method="greedy_search",
+        )
+        self._pad_s = chunk * 0.04  # 모델 카드 권장: 끝에 CHUNK × 0.04초 무음
+        self._stream = self._rec.create_stream()
+        self._last = ""
+        self._fed = 0
+
+    def accept(self, samples: np.ndarray) -> list[AsrEvent]:
+        samples = np.asarray(samples, dtype=np.float32)
+        self._fed += len(samples)
+        self._stream.accept_waveform(SAMPLE_RATE, samples)
+        while self._rec.is_ready(self._stream):
+            self._rec.decode_stream(self._stream)
+        text = self._rec.get_result(self._stream).strip()
+        t = self._fed / SAMPLE_RATE
+        events: list[AsrEvent] = []
+        if text != self._last:
+            events.append(AsrEvent("partial", text, t))
+            self._last = text
+        if self._rec.is_endpoint(self._stream):
+            if text:
+                events.append(AsrEvent("final", text, t))
+            self._rec.reset(self._stream)
+            self._last = ""
+        return events
+
+    def finish(self) -> list[AsrEvent]:
+        pad = np.zeros(int(self._pad_s * SAMPLE_RATE), dtype=np.float32)
+        self._stream.accept_waveform(SAMPLE_RATE, pad)
+        self._stream.input_finished()
+        while self._rec.is_ready(self._stream):
+            self._rec.decode_stream(self._stream)
+        text = self._rec.get_result(self._stream).strip()
+        self._stream = self._rec.create_stream()
+        self._last = ""
+        return [AsrEvent("final", text, self._fed / SAMPLE_RATE)] if text else []
