@@ -37,13 +37,14 @@ class NllbTranslator:
     def loaded(self) -> bool:
         return self._tr is not None
 
-    def translate(self, text: str, lang: str) -> str:
+    def translate(self, text: str, lang: str, src: str = "ko") -> str:
         if self._tr is None:
             self._sp, self._tr = self._loader(self.model_dir, self.intra_threads)
         code = get(lang).nllb
+        source = SOURCE_NLLB if src == "ko" else get(src).nllb
         tokens = self._sp.encode(text, out_type=str)
         result = self._tr.translate_batch(
-            [[SOURCE_NLLB, *tokens, "</s>"]],
+            [[source, *tokens, "</s>"]],
             target_prefix=[[code]],
             beam_size=self.beam_size,
             max_decoding_length=len(tokens) * 2 + 16,

@@ -66,7 +66,21 @@ def test_unknown_token_removed_and_empty_is_error():
         t.translate("a", "zh")
 
 
+def test_source_language_can_be_english():
+    t, tr, _ = make(["khk_Cyrl", "Анхаарлаа"])
+    t.translate("Please focus", "mn", src="en")
+    src, _ = tr.calls[0]
+    assert src[0][0] == "eng_Latn"
+
+
 @pytest.mark.models
 def test_real_model(model_path):
     out = NllbTranslator(model_path("nllb-600m")).translate("집중하세요.", "en").lower()
+    assert "focus" in out or "concentrat" in out
+
+
+@pytest.mark.models
+@pytest.mark.parametrize("folder", ["nllb-1.3b", "tsengel-1.3b"])
+def test_real_1_3b_models(model_path, folder):
+    out = NllbTranslator(model_path(folder)).translate("집중하세요.", "en").lower()
     assert "focus" in out or "concentrat" in out
