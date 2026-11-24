@@ -1,0 +1,60 @@
+{
+  "models": {
+    "nllb-600m": {
+      "dir": "nllb-600m",
+      "files": [
+        {"name": "config.json", "size": 159,
+         "sha256": "0c2f6fa2057c7264d052fb4a62ba3476eeae70487acddfa8e779a53a00cbf44c",
+         "url": "https://huggingface.co/JustFrederik/nllb-200-distilled-600M-ct2-int8/resolve/302d78f00e6fdb50a1064059df7c392b735e9d05/config.json"},
+        {"name": "model.bin", "size": 622595991,
+         "sha256": "ed1beaf75134de7505315a5223162f56acff397eff6b50638a500d3936fe707b",
+         "url": "https://huggingface.co/JustFrederik/nllb-200-distilled-600M-ct2-int8/resolve/302d78f00e6fdb50a1064059df7c392b735e9d05/model.bin"},
+        {"name": "sentencepiece.bpe.model", "size": 4852054,
+         "sha256": "14bb8dfb35c0ffdea7bc01e56cea38b9e3d5efcdcb9c251d6b40538e1aab555a",
+         "url": "https://huggingface.co/JustFrederik/nllb-200-distilled-600M-ct2-int8/resolve/302d78f00e6fdb50a1064059df7c392b735e9d05/sentencepiece.bpe.model"},
+        {"name": "shared_vocabulary.txt", "size": 2568098,
+         "sha256": "a132a83330f45514c2476eb81d1d69b3c41762264d16ce0a7ea982e5d6c728e5",
+         "url": "https://huggingface.co/JustFrederik/nllb-200-distilled-600M-ct2-int8/resolve/302d78f00e6fdb50a1064059df7c392b735e9d05/shared_vocabulary.txt"}
+      ]
+    },
+    "hymt2-q4": {
+      "dir": "hymt2",
+      "files": [
+        {"name": "Hy-MT2-1.8B-Q4_K_M.gguf", "size": 1133080448,
+         "sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+         "url": "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf"}
+      ]
+    },
+    "zipformer-ko": {
+      "dir": "zipformer-ko",
+      "files": [
+        {"name": "encoder-epoch-99-avg-1-chunk-64-left-128.int8.onnx", "size": 156826043,
+         "sha256": "b8fb024cab6991f64ca5d2cecbd8a038c7c85fc95593f4bf90f86afd91eacf76",
+         "url": "https://huggingface.co/kangkyu/icefall-asr-ko-streaming-zipformer-174m/resolve/f0e73b1653c3ea75898c6d949dd71c690c9121da/encoder-epoch-99-avg-1-chunk-64-left-128.int8.onnx"},
+        {"name": "decoder-epoch-99-avg-1-chunk-64-left-128.int8.onnx", "size": 1544210,
+         "sha256": "f5dfa6c8609b29da86c739d4904889475c33b62e28e70c619952a0ee6c31416f",
+         "url": "https://huggingface.co/kangkyu/icefall-asr-ko-streaming-zipformer-174m/resolve/f0e73b1653c3ea75898c6d949dd71c690c9121da/decoder-epoch-99-avg-1-chunk-64-left-128.int8.onnx"},
+        {"name": "joiner-epoch-99-avg-1-chunk-64-left-128.int8.onnx", "size": 1270777,
+         "sha256": "64efd9aeb71fb2278c713b3d5eb5ec45edf6b2ccd8716d3709044f17723c13fd",
+         "url": "https://huggingface.co/kangkyu/icefall-asr-ko-streaming-zipformer-174m/resolve/f0e73b1653c3ea75898c6d949dd71c690c9121da/joiner-epoch-99-avg-1-chunk-64-left-128.int8.onnx"},
+        {"name": "tokens.txt", "size": 20844,
+         "sha256": "435dfb9e0a2b6a79124f1a4d8f0f33a951b25384726e2e0d854f081533e6ec9d",
+         "url": "https://huggingface.co/kangkyu/icefall-asr-ko-streaming-zipformer-174m/resolve/f0e73b1653c3ea75898c6d949dd71c690c9121da/tokens.txt"}
+      ]
+    },
+    "sensevoice-ko": {
+      "dir": "sensevoice",
+      "archive": {"size": 163002883,
+        "sha256": "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2"}
+    },
+    "silero-vad": {
+      "dir": "vad",
+      "files": [
+        {"name": "silero_vad.onnx", "size": 643854,
+         "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+         "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"}
+      ]
+    }
+  }
+}
