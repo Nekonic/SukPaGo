@@ -38,6 +38,13 @@
    - 결과 줄마다 다시 듣기 버튼이 있습니다.
    - 새 음성이 시작되면 재생 중이던 소리는 멈춥니다.
 7. **항상 맨 앞**: 창은 `topmost`로 다른 창 위에 뜹니다. 📌 버튼으로 끄고 켤 수 있고, 기본값은 켜짐입니다.
+8. **번역 전용 창**
+   - 메인 창의 [번역 창 띄우기] 버튼으로 엽니다. 번역문만 크게 보여 주는 별도 창이라 프로젝터나 두 번째 모니터에 띄우는 용도입니다.
+   - 메인 창의 언어 토글을 그대로 따릅니다. 한국어 원문, 버튼, 입력창은 없습니다.
+   - 글자 크기는 [A−]/[A+] 버튼(8px씩), 슬라이더, `Ctrl` + 마우스 휠로 24~120px 사이에서 바꿉니다. 기본값은 56px입니다.
+   - [이전 문장] 토글로 직전 문장을 흐린 작은 글씨(현재 크기의 45%)로 같이 보여 줍니다.
+   - 이 창도 기본으로 맨 앞에 뜨고, 📌 버튼이 따로 있습니다.
+   - 글자 크기, 창 위치·크기, 이전 문장 표시 여부는 `settings.json`에 저장합니다.
 
 ## 3. 엔진
 
@@ -152,7 +159,7 @@ SukPaGo/
 ├─ pyproject.toml, uv.lock, .python-version (3.13)
 ├─ src/sukpago/
 │  ├─ __main__.py          # 진입점
-│  ├─ config.py            # settings.json (모드, 언어 토글, 이메일, 맨 앞 여부, 창 위치)
+│  ├─ config.py            # settings.json (모드, 언어 토글, 이메일, 맨 앞 여부, 창 위치, 번역 창 글자 크기)
 │  ├─ paths.py             # exe 기준 models/, assets/ 경로 (PyInstaller에서도 동작)
 │  ├─ languages.py         # 언어 정의와 엔진별 코드 표
 │  ├─ phrases.py           # 고정 문장 + assets/phrases.json
@@ -178,7 +185,9 @@ SukPaGo/
 │  │  └─ router.py
 │  ├─ audio.py             # miniaudio 재생과 정지 (한 번에 하나)
 │  ├─ pipeline.py          # 마이크 → 인식 → 정리 → 번역 → UI 연결 (스레드와 큐)
-│  └─ ui/app.py            # CustomTkinter 창
+│  └─ ui/
+│     ├─ app.py            # CustomTkinter 메인 창
+│     └─ display.py        # 번역 전용 창 (CTkToplevel, 글자 크기 조절)
 ├─ assets/ phrases.json, glossary.json, engines.json
 ├─ tools/ evaluate.py, download_models.py, build_phrase_audio.py, models.lock.json
 ├─ packaging/sukpago.spec  # PyInstaller onedir
@@ -211,7 +220,10 @@ SukPaGo/
 └──────────────────────────────────────────────────────┘
 ```
 
-- 최신 결과는 28pt, 이전 결과는 16pt로 표시합니다.
+- 화면 목업: https://claude.ai/artifact/B5Tn8M1U39qwVPppuDEKmY (메인 화면과 번역 전용 창)
+- 메인 창 헤더에 [번역 창 띄우기] 버튼이 있습니다.
+- 번역 전용 창은 검은 배경에 흰 글씨이고, 위쪽 도구 줄에 글자 크기 조절, 이전 문장 토글, 📌가 있습니다.
+- 메인 창에서 최신 결과는 28pt, 이전 결과는 16pt로 표시합니다.
 - 글꼴은 Windows 기본 글꼴을 씁니다: 한국어 `Malgun Gothic`, 중국어 `Microsoft YaHei`, 몽골어·영어 `Segoe UI`.
 - 상태 표시줄에는 현재 메모리 사용량(psutil)을 보여 줍니다. 시연할 때 "2GB 이하"를 보여 주기 위해서입니다.
 
