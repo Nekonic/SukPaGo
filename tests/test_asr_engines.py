@@ -47,3 +47,14 @@ def test_sensevoice_recognizes_korean(model_path):
     rec = SenseVoiceRecognizer(model_path("sensevoice"), model_path("vad", "silero_vad.onnx"))
     text = run(rec, load_wav_16k_mono(model_path("sensevoice", "test_wavs", "ko.wav")))
     assert HANGUL.search(text), text
+
+
+@pytest.mark.models
+@pytest.mark.parametrize("hotwords", [(), ("NotebookLM", "할루시네이션")])
+def test_qwen3_recognizes_korean(model_path, hotwords):
+    from sukpago.asr.qwen3 import Qwen3AsrRecognizer
+
+    rec = Qwen3AsrRecognizer(model_path("qwen3-asr"), model_path("vad", "silero_vad.onnx"),
+                             hotwords=hotwords)
+    text = run(rec, load_wav_16k_mono(model_path("sensevoice", "test_wavs", "ko.wav")))
+    assert HANGUL.search(text), text
