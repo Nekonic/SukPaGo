@@ -100,6 +100,7 @@ dependencies = [
   "sentencepiece==0.2.3",
   "llama-cpp-python==0.3.38",
   "sherpa-onnx==1.13.8",
+  "sherpa-onnx-core==1.13.8",
   "psutil>=6.0",
 ]
 

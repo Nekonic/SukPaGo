@@ -221,3 +221,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# 석파고: 모델, 강의 녹음, 평가 결과는 커밋하지 않는다
+models/
+eval_data/
+eval_out/
+*.part
