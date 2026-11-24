@@ -74,7 +74,8 @@ def test_extract_blocks_path_traversal(tmp_path):
 
 def test_lock_file_is_complete():
     lock = json.loads(dm.LOCK.read_text("utf-8"))["models"]
-    assert set(lock) == {"nllb-600m", "hymt2-q4", "zipformer-ko", "sensevoice-ko", "silero-vad"}
+    assert set(lock) == {"nllb-600m", "hymt2-q4", "zipformer-ko", "sensevoice-ko", "silero-vad",
+                         "nllb-1.3b", "tsengel-1.3b", "tgemma-q4", "qwen3-asr"}
     for spec in lock.values():
         entries = spec.get("files", []) + ([spec["archive"]] if "archive" in spec else [])
         assert entries

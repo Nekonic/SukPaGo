@@ -55,6 +55,54 @@
          "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"}
       ]
+    },
+    "nllb-1.3b": {
+      "dir": "nllb-1.3b",
+      "files": [
+        {"name": "config.json", "size": 1071,
+         "sha256": "bb11352c2579e31d4251500cd3d813beb6ab083c8a60268db52e9698c1c9cda2",
+         "url": "https://huggingface.co/OpenNMT/nllb-200-distilled-1.3B-ct2-int8/resolve/70f572adafa4794890ce7826156a4209717855af/config.json"},
+        {"name": "model.bin", "size": 1377755738,
+         "sha256": "89dc4b9eb7f4dcd3ff36023c9b1c55fcecb47ddc0df97ab31b068ef9cf194940",
+         "url": "https://huggingface.co/OpenNMT/nllb-200-distilled-1.3B-ct2-int8/resolve/70f572adafa4794890ce7826156a4209717855af/model.bin"},
+        {"name": "shared_vocabulary.json", "size": 5921176,
+         "sha256": "af53bfd0e6f726209e7325e45b87ab3b14e5856f7d42d7b9be91de3287c45267",
+         "url": "https://huggingface.co/OpenNMT/nllb-200-distilled-1.3B-ct2-int8/resolve/70f572adafa4794890ce7826156a4209717855af/shared_vocabulary.json"},
+        {"name": "sentencepiece.bpe.model", "size": 4852054,
+         "sha256": "14bb8dfb35c0ffdea7bc01e56cea38b9e3d5efcdcb9c251d6b40538e1aab555a",
+         "url": "https://huggingface.co/JustFrederik/nllb-200-distilled-600M-ct2-int8/resolve/302d78f00e6fdb50a1064059df7c392b735e9d05/sentencepiece.bpe.model"}
+      ]
+    },
+    "tsengel-1.3b": {
+      "dir": "tsengel-1.3b",
+      "files": [
+        {"name": "config.json", "size": 223,
+         "sha256": "8f6496adfc930cbfecbe8281112197705c488fab47d34b4829b06d7f478909af",
+         "url": "https://huggingface.co/Tsengel-mn/nllb-1.3b-mongolian-ct2-int8/resolve/d012f6d8d12f15847e035abe7cf7125d868daa0a/config.json"},
+        {"name": "model.bin", "size": 1377755777,
+         "sha256": "3a4b0a49ca3710fb9fa5c8506075622d04547fc904bc21a263d5dd0171f69c9d",
+         "url": "https://huggingface.co/Tsengel-mn/nllb-1.3b-mongolian-ct2-int8/resolve/d012f6d8d12f15847e035abe7cf7125d868daa0a/model.bin"},
+        {"name": "shared_vocabulary.json", "size": 5921176,
+         "sha256": "af53bfd0e6f726209e7325e45b87ab3b14e5856f7d42d7b9be91de3287c45267",
+         "url": "https://huggingface.co/Tsengel-mn/nllb-1.3b-mongolian-ct2-int8/resolve/d012f6d8d12f15847e035abe7cf7125d868daa0a/shared_vocabulary.json"},
+        {"name": "sentencepiece.bpe.model", "size": 4852054,
+         "sha256": "14bb8dfb35c0ffdea7bc01e56cea38b9e3d5efcdcb9c251d6b40538e1aab555a",
+         "url": "https://huggingface.co/Tsengel-mn/nllb-1.3b-mongolian-ct2-int8/resolve/d012f6d8d12f15847e035abe7cf7125d868daa0a/sentencepiece.bpe.model"}
+      ]
+    },
+    "tgemma-q4": {
+      "dir": "tgemma",
+      "files": [
+        {"name": "translategemma-4b-it.Q4_K_M.gguf", "size": 2489909760,
+         "sha256": "81200d03e843d2ec1ece6eeafe7d13cb6e5211e1fcd336ade55790b683a08330",
+         "url": "https://huggingface.co/mradermacher/translategemma-4b-it-GGUF/resolve/d37868f759d2f817a43d28dd80cf9f982ffa62fd/translategemma-4b-it.Q4_K_M.gguf"}
+      ]
+    },
+    "qwen3-asr": {
+      "dir": "qwen3-asr",
+      "archive": {"size": 878702423,
+        "sha256": "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96",
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2"}
     }
   }
 }
