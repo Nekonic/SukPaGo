@@ -86,7 +86,7 @@ def flags(row: dict) -> str:
     if has_traditional_mongolian(mn):
         found.append("몽골어 전통 문자")
     elif not is_cyrillic_mongolian(mn):
-        found.append("몽골어 키릴 아님")
+        found.append("할하 몽골어 아님")
     found += [f"{lang} 반복" for lang in TARGET_ORDER if has_repetition(row.get(lang, ""))]
     return ", ".join(found) or "-"
 

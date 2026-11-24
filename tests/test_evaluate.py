@@ -31,7 +31,8 @@ def test_flags():
     ok = {"mn": "Анхаарлаа төвлөрүүл.", "zh": "请集中注意力。", "en": "Please focus."}
     assert evaluate.flags(ok) == "-"
     assert "몽골어 전통 문자" in evaluate.flags({**ok, "mn": "ᠮᠣᠩᠭᠣᠯ"})
-    assert "몽골어 키릴 아님" in evaluate.flags({**ok, "mn": "Mongolian"})
+    assert "할하 몽골어 아님" in evaluate.flags({**ok, "mn": "Mongolian"})
+    assert "할하 몽골어 아님" in evaluate.flags({**ok, "mn": "Это проблема мира, которая встретила меня."})
     assert "zh 반복" in evaluate.flags({**ok, "zh": "解释论文解释论文解释论文"})
 
 

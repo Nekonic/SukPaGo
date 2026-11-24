@@ -8,6 +8,10 @@ from collections import Counter
 
 _TRAD_MN = re.compile(r"[᠀-᢯]")
 _CYRILLIC = re.compile(r"[Ѐ-ӿ]")
+_KHALKHA_ONLY = re.compile(r"[өүӨҮ]")
+# 세르비아어·우크라이나어·마케도니아어 등에만 있고 몽골어 키릴 자모에는 없는 글자
+_FOREIGN_CYRILLIC = re.compile(r"[ђјљњћџѓќѕіїєґўЂЈЉЊЋЏЃЌЅІЇЄҐЎ]")
+_SHORT = 15  # 키릴 글자가 이보다 적으면 ө/ү가 없어도 통과("Ойлгов уу?")
 
 
 def has_traditional_mongolian(text: str) -> bool:
@@ -15,7 +19,11 @@ def has_traditional_mongolian(text: str) -> bool:
 
 
 def is_cyrillic_mongolian(text: str) -> bool:
-    return bool(_CYRILLIC.search(text)) and not has_traditional_mongolian(text)
+    """할하(몽골국) 키릴 몽골어처럼 보이는지. 러시아어·세르비아어 등은 False."""
+    cyr = _CYRILLIC.findall(text)
+    if not cyr or has_traditional_mongolian(text) or _FOREIGN_CYRILLIC.search(text):
+        return False
+    return len(cyr) < _SHORT or bool(_KHALKHA_ONLY.search(text))
 
 
 def has_repetition(text: str, n: int = 3, times: int = 3) -> bool:

@@ -11,6 +11,17 @@ def test_mongolian_script_detection():
     assert not is_cyrillic_mongolian("Please focus.")
 
 
+def test_russian_and_serbian_are_not_khalkha():
+    assert not is_cyrillic_mongolian("Это проблема мира, которая встретила меня пять лет назад.")
+    assert not is_cyrillic_mongolian("Свет костима ће продужати се до следећег дана.")
+    assert not is_cyrillic_mongolian("Але, если се одно и удасться, це є проблем.")
+
+
+def test_real_khalkha_passes_including_short_without_special_letters():
+    assert is_cyrillic_mongolian("Ирэх долоо хоногийн мягмар гараг хүртэл гэрийн даалгавраа өгнө үү.")
+    assert is_cyrillic_mongolian("Ойлгов уу?")
+
+
 def test_repetition_words():
     loop = ("it's really easy to go to a website that explains virtue, and it's really easy to go "
             "to a website that explains virtue, and it's really easy to go to a website")
