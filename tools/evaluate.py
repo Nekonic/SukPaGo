@@ -21,28 +21,38 @@ from sukpago.languages import TARGET_ORDER
 from sukpago.quality import has_repetition, has_traditional_mongolian, is_cyrillic_mongolian, peak_rss_mb
 from sukpago.text.assembler import SentenceAssembler
 
-ASR_CANDIDATES = ("zipformer", "sensevoice")
-MT_CANDIDATES = ("hymt", "nllb")
+ASR_CANDIDATES = ("zipformer", "sensevoice", "qwen3", "qwen3_hw")
+MT_CANDIDATES = ("nllb600", "nllb13", "nllb13_pivot", "tsengel13", "tsengel13_pivot", "tgemma", "tgemma_pivot")
+COMBOS = tuple((a, m) for a in ("zipformer", "qwen3") for m in ("nllb13", "tsengel13", "tgemma"))
 STEP = SAMPLE_RATE // 10  # 마이크처럼 0.1초씩 넣는다
-BUDGET_MB = 1800
+BUDGET_MB = 3500  # 4GB에서 TTS·화면 몫 약 0.5GB를 뺀 값
+EVAL_HOTWORDS = ("NotebookLM", "할루시네이션", "PDF", "YouTube", "Claude", "Gemini")
 
 
 def make_asr(name: str):
     m = paths.models_dir()
+    vad = m / "vad" / "silero_vad.onnx"
     if name == "zipformer":
         from sukpago.asr.zipformer import ZipformerRecognizer
         return ZipformerRecognizer(m / "zipformer-ko")
-    from sukpago.asr.sensevoice import SenseVoiceRecognizer
-    return SenseVoiceRecognizer(m / "sensevoice", m / "vad" / "silero_vad.onnx")
+    if name == "sensevoice":
+        from sukpago.asr.sensevoice import SenseVoiceRecognizer
+        return SenseVoiceRecognizer(m / "sensevoice", vad)
+    from sukpago.asr.qwen3 import Qwen3AsrRecognizer
+    return Qwen3AsrRecognizer(m / "qwen3-asr", vad, hotwords=EVAL_HOTWORDS if name == "qwen3_hw" else ())
 
 
 def make_mt(name: str):
     m = paths.models_dir()
-    if name == "hymt":
-        from sukpago.translate.hymt import HyMtTranslator
-        return HyMtTranslator(m / "hymt2" / "Hy-MT2-1.8B-Q4_K_M.gguf")
-    from sukpago.translate.nllb import NllbTranslator
-    return NllbTranslator(m / "nllb-600m")
+    from sukpago.translate.pivot import PivotTranslator
+    if name.startswith("tgemma"):
+        from sukpago.translate.gemma import TranslateGemmaTranslator
+        engine = TranslateGemmaTranslator(m / "tgemma" / "translategemma-4b-it.Q4_K_M.gguf")
+    else:
+        from sukpago.translate.nllb import NllbTranslator
+        folder = {"nllb600": "nllb-600m", "nllb13": "nllb-1.3b", "tsengel13": "tsengel-1.3b"}
+        engine = NllbTranslator(m / folder[name.removesuffix("_pivot")])
+    return PivotTranslator(engine, name=name) if name.endswith("_pivot") else engine
 
 
 def run_asr(rec, samples: np.ndarray) -> dict:
@@ -180,15 +190,14 @@ def main() -> int:
         lines.append("")
 
     lines += [f"## 함께 올렸을 때 최대 메모리 (1분 인식 + 3문장 번역, 목표 {BUDGET_MB}MB 이하)", ""]
-    for a in ASR_CANDIDATES:
-        for m in MT_CANDIDATES:
-            print(f"메모리 {a} + {m}")
-            r = call_worker(["combo", a, m, str(wavs[0]), str(sent_file)])
-            if "error" in r:
-                lines.append(f"- {a} + {m}: 실행 실패 — {r['error']}")
-            else:
-                over = " (목표 초과)" if r["peak_mb"] > BUDGET_MB else ""
-                lines.append(f"- {a} + {m}: {r['peak_mb']:.0f}MB{over}")
+    for a, m in COMBOS:
+        print(f"메모리 {a} + {m}")
+        r = call_worker(["combo", a, m, str(wavs[0]), str(sent_file)])
+        if "error" in r:
+            lines.append(f"- {a} + {m}: 실행 실패 — {r['error']}")
+        else:
+            over = " (목표 초과)" if r["peak_mb"] > BUDGET_MB else ""
+            lines.append(f"- {a} + {m}: {r['peak_mb']:.0f}MB{over}")
     report = args.out / "report.md"
     report.write_text("\n".join(lines) + "\n", "utf-8")
     print(f"보고서: {report}")
