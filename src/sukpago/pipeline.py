@@ -68,29 +68,14 @@ class MicLevel:
 
 
 def _level(samples: np.ndarray) -> tuple[float, float]:
-    try:
-        from .asr.mic import level
-    except ImportError:
-        x = np.asarray(samples, dtype=np.float32)
-        if x.size == 0:
-            return -120.0, 0.0
-        rms = float(np.sqrt(np.mean(np.square(x, dtype=np.float64))))
-        dbfs = 20.0 * math.log10(rms) if rms > 0 else -120.0
-        return max(dbfs, -120.0), float(np.mean(np.abs(x) >= 0.99))
+    from .asr.mic import level
+
     return level(samples)
 
 
 def _classify(dbfs: float, clip_ratio: float) -> str:
-    try:
-        from .asr.mic import classify
-    except ImportError:
-        if clip_ratio >= 0.01:
-            return "loud"
-        if dbfs < -60:
-            return "silent"
-        if dbfs < -40:
-            return "quiet"
-        return "ok"
+    from .asr.mic import classify
+
     return classify(dbfs, clip_ratio)
 
 
