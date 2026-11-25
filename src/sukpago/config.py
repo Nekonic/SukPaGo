@@ -20,15 +20,10 @@ DEFAULT_GLOSSARY = (
 class Settings:
     online: bool = True
     langs: list[str] = field(default_factory=lambda: ["mn", "zh"])
-    read_aloud: bool = False
-    pinned: bool = True
     mymemory_email: str = "abcd@gmail.com"
-    mic_device: str | None = None
     main_geometry: str | None = None
     display_geometry: str | None = None
     display_font_px: int = 52
-    display_prev_scale: float = 0.75
-    display_pinned: bool = True
 
 
 def _is_bool(v) -> bool:
@@ -37,10 +32,6 @@ def _is_bool(v) -> bool:
 
 def _is_int(v) -> bool:
     return isinstance(v, int) and not isinstance(v, bool)
-
-
-def _is_float(v) -> bool:
-    return isinstance(v, (int, float)) and not isinstance(v, bool)
 
 
 def _is_str(v) -> bool:
@@ -59,15 +50,10 @@ def _is_langs(v) -> bool:
 _CHECKS = {
     "online": _is_bool,
     "langs": _is_langs,
-    "read_aloud": _is_bool,
-    "pinned": _is_bool,
     "mymemory_email": _is_str,
-    "mic_device": _is_opt_str,
     "main_geometry": _is_opt_str,
     "display_geometry": _is_opt_str,
     "display_font_px": _is_int,
-    "display_prev_scale": _is_float,
-    "display_pinned": _is_bool,
 }
 
 
@@ -79,9 +65,7 @@ def load_settings() -> Settings:
     for f in fields(Settings):
         if f.name in data and _CHECKS[f.name](data[f.name]):
             v = data[f.name]
-            if f.name == "display_prev_scale":
-                v = float(v)
-            elif f.name == "langs":
+            if f.name == "langs":
                 v = list(v)
             values[f.name] = v
     return Settings(**values)

@@ -17,29 +17,26 @@ def test_defaults():
     s = config.load_settings()
     assert s == Settings()
     assert s.mymemory_email == "abcd@gmail.com"
-    assert s.online is True and s.langs == ["mn", "zh"] and s.read_aloud is False
-    assert s.pinned is True and s.display_pinned is True
-    assert s.display_font_px == 52 and s.display_prev_scale == 0.75
-    assert s.mic_device is None and s.main_geometry is None and s.display_geometry is None
+    assert s.online is True and s.langs == ["mn", "zh"]
+    assert s.display_font_px == 52
+    assert s.main_geometry is None and s.display_geometry is None
 
 
 def test_save_load_roundtrip():
-    s = Settings(online=False, langs=["en"], read_aloud=True, pinned=False, mymemory_email="x@y.z",
-                 mic_device="마이크 (USB)", main_geometry="800x600+10+20", display_geometry="1200x400+0+0",
-                 display_font_px=80, display_prev_scale=0.9, display_pinned=False)
+    s = Settings(online=False, langs=["en"], mymemory_email="x@y.z", main_geometry="800x600+10+20",
+                 display_geometry="1200x400+0+0", display_font_px=80)
     config.save_settings(s)
     assert config.load_settings() == s
 
 
 def test_unknown_keys_ignored_and_bad_values_default():
     userdata.write_json("settings.json", {"display_font_px": "big", "online": False, "whatever": 1,
-                                          "langs": "mn", "mic_device": 3, "display_prev_scale": 1})
+                                          "langs": "mn", "main_geometry": 3})
     s = config.load_settings()
     assert s.display_font_px == 52
     assert s.online is False
     assert s.langs == ["mn", "zh"]
-    assert s.mic_device is None
-    assert s.display_prev_scale == 1.0
+    assert s.main_geometry is None
 
 
 def test_bool_is_not_int():

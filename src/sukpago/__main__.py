@@ -53,7 +53,7 @@ def main() -> int:
 
     from .ui.app import App
 
-    app = App(pipeline, settings, speaker=speaker, glossary=glossary)
+    app = App(pipeline, settings, glossary)
     try:
         app.mainloop()
     finally:

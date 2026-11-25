@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import queue
 import threading
 import time
@@ -26,9 +25,7 @@ if TYPE_CHECKING:
     from .tts.base import Speaker
 
 TICK_S = 0.1
-LEVEL_EVERY_S = 0.2
 DELAY_AT = 3
-MAX_INPUT_CHARS = 500
 _STOP = object()
 
 
@@ -58,25 +55,6 @@ class Translation:
 class Status:
     kind: str  # "mic_error" | "fallback" | "quota" | "tts_error" | "audio_error" | "delay" | "info"
     message: str
-
-
-@dataclass(frozen=True)
-class MicLevel:
-    dbfs: float
-    clip_ratio: float
-    state: str
-
-
-def _level(samples: np.ndarray) -> tuple[float, float]:
-    from .asr.mic import level
-
-    return level(samples)
-
-
-def _classify(dbfs: float, clip_ratio: float) -> str:
-    from .asr.mic import classify
-
-    return classify(dbfs, clip_ratio)
 
 
 def _default_audio_path(phrase: Phrase, lang: str) -> Path:
@@ -142,10 +120,6 @@ class Pipeline:
         with self._lock:
             self._settings.online = bool(online)
 
-    def set_read_aloud(self, on: bool) -> None:
-        with self._lock:
-            self._settings.read_aloud = bool(on)
-
     def set_glossary(self, g: Glossary) -> None:
         with self._lock:
             self._glossary = g
@@ -168,7 +142,7 @@ class Pipeline:
             return
         audio_q: queue.Queue = queue.Queue()
         try:
-            mic = self._mic_factory(self._settings.mic_device, audio_q.put)
+            mic = self._mic_factory(None, audio_q.put)
             mic.start()
         except Exception as e:
             self._emit(Status("mic_error", f"마이크를 열지 못했습니다: {e}"))
@@ -198,7 +172,6 @@ class Pipeline:
         assembler = self._assembler
         assert assembler is not None
         last_partial = ""
-        last_level = -math.inf
         last_tick = self._clock()
 
         def handle(events) -> None:
@@ -220,11 +193,6 @@ class Pipeline:
             if item is _STOP:
                 break
             if item is not None:
-                now = self._clock()
-                if now - last_level >= LEVEL_EVERY_S:
-                    last_level = now
-                    dbfs, clip = _level(item)
-                    self._emit(MicLevel(dbfs, clip, _classify(dbfs, clip)))
                 handle(recognizer.accept(item))
             now = self._clock()
             if item is None or now - last_tick >= TICK_S:
@@ -245,16 +213,6 @@ class Pipeline:
 
     # ---- 직접 입력과 번역 ----
 
-    def submit_text(self, ko: str) -> int:
-        ko = ko.strip()
-        if not ko:
-            self._emit(Status("info", "번역할 문장을 입력하세요"))
-            return -1
-        if len(ko) > MAX_INPUT_CHARS:
-            self._emit(Status("info", f"{MAX_INPUT_CHARS}자까지 번역할 수 있습니다"))
-            return -1
-        return self._final(ko, "text")
-
     def _finals(self, sentences: list[str], source: str) -> None:
         for s in sentences:
             self._final(s, source)
@@ -270,10 +228,6 @@ class Pipeline:
             self._emit(Status("delay", "번역 지연"))
         return seq
 
-    def translate_once(self, ko: str) -> dict[str, str]:
-        online = self._online()
-        return {lang: self._router.translate(ko, lang, online=online).text for lang in self._langs()}
-
     def _translate_loop(self) -> None:
         while not self._closed:
             item = self._trans_q.get()
@@ -281,7 +235,6 @@ class Pipeline:
                 return
             seq, ko, source = item
             online = self._online()
-            texts: dict[str, str] = {}
             fallback_reason: str | None = None
             for lang in self._langs():
                 try:
@@ -290,7 +243,6 @@ class Pipeline:
                     self._emit(Status("info", f"번역하지 못했습니다({lang}): {e}"))
                     continue
                 reason = getattr(r, "reason", None)
-                texts[lang] = r.text
                 self._emit(Translation(seq, lang, r.text, r.engine, r.fell_back, reason))
                 if reason == "quota":
                     if not self._quota_told:
@@ -302,16 +254,8 @@ class Pipeline:
                 self._emit(Status("fallback", f"오프라인으로 전환됨 ({fallback_reason})"))
             if self._trans_q.empty():
                 self._delayed = False
-            with self._lock:
-                read_aloud = bool(self._settings.read_aloud)
-            if texts and (source == "text" or read_aloud):
-                self.speak(texts)
 
     # ---- 음성 ----
-
-    def speak(self, texts: dict[str, str]) -> None:
-        if self._online():
-            self._speech_q.put(lambda: self._speak_now(texts))
 
     def play_phrase(self, phrase: Phrase) -> None:
         self._speech_q.put(lambda: self._play_phrase_now(phrase))
@@ -338,19 +282,6 @@ class Pipeline:
             fn()
         except Exception as e:
             self._emit(Status("audio_error", f"소리를 재생하지 못했습니다: {e}"))
-
-    def _speak_now(self, texts: dict[str, str]) -> None:
-        if not self._online():
-            return
-        clips: list[bytes] = []
-        for lang in self._langs():
-            if texts.get(lang):
-                clip = self._synth(texts[lang], lang)
-                if clip is None:
-                    break  # 같은 이유로 다음 언어도 실패할 가능성이 크다. 알림은 한 번만.
-                clips.append(clip)
-        if clips:
-            self._play(lambda: self._player.play(clips))
 
     def _play_phrase_now(self, phrase: Phrase) -> None:
         online = self._online()

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from sukpago.asr.base import AsrEvent
-from sukpago.pipeline import Final, MicLevel, Partial, Pipeline, Status, Translation
+from sukpago.pipeline import Final, Partial, Pipeline, Status, Translation
 from sukpago.text.glossary import Glossary, Rule
 
 TIMEOUT = 2
@@ -17,10 +17,8 @@ TIMEOUT = 2
 class FakeSettings:
     online: bool = True
     langs: list[str] = field(default_factory=lambda: ["mn", "zh"])
-    read_aloud: bool = False
     pinned: bool = True
     mymemory_email: str = "abcd@gmail.com"
-    mic_device: str | None = None
     main_geometry: str | None = None
     display_geometry: str | None = None
     display_font_px: int = 52
@@ -152,11 +150,8 @@ def pipes():
         p.shutdown()
 
 
-def next_event(p, skip=(MicLevel,)):
-    while True:
-        ev = p.events.get(timeout=TIMEOUT)
-        if not isinstance(ev, skip):
-            return ev
+def next_event(p):
+    return p.events.get(timeout=TIMEOUT)
 
 
 def feed(mic):
@@ -178,15 +173,6 @@ def test_live_partial_final_translations_in_order(pipes):
     assert (t2.seq, t2.lang) == (final.seq, "zh")
 
 
-def test_mic_level_emitted(pipes):
-    p, *_, mics = pipes()
-    p.start_live()
-    feed(mics[0])
-    ev = p.events.get(timeout=TIMEOUT)
-    assert isinstance(ev, MicLevel)
-    assert ev.state == "silent"
-
-
 def test_filler_only_final_makes_no_final(pipes):
     p, *_, mics = pipes([[("final", "어 음")], [("final", "다음 문장으로 넘어갈게요")]])
     p.start_live()
@@ -197,48 +183,38 @@ def test_filler_only_final_makes_no_final(pipes):
     assert ev.ko == "다음 문장으로 넘어갈게요"
 
 
-def test_submit_text_translates_then_plays(pipes):
-    p, _, speaker, player, _ = pipes()
-    seq = p.submit_text("질문 있나요?")
-    assert next_event(p) == Final(seq, "질문 있나요?", "text")
-    assert [next_event(p).lang for _ in range(2)] == ["mn", "zh"]
-    kind, clips = player.played.get(timeout=TIMEOUT)
-    assert kind == "clips"
-    assert clips == ["mn|mn:질문 있나요?".encode(), "zh|zh:질문 있나요?".encode()]
-
-
-@pytest.mark.parametrize("read_aloud", [False, True])
-def test_live_read_aloud_setting(pipes, read_aloud):
-    settings = FakeSettings(langs=["mn"], read_aloud=read_aloud)
-    p, _, speaker, player, mics = pipes([[("final", "실시간 강의 문장입니다")]], settings=settings)
+def test_live_sentence_is_not_read_aloud(pipes):
+    p, _, speaker, player, mics = pipes([[("final", "실시간 강의 문장입니다")]],
+                                        settings=FakeSettings(langs=["mn"]))
     p.start_live()
     feed(mics[0])
     assert isinstance(next_event(p), Final)
     assert isinstance(next_event(p), Translation)
-    # 표시로 쓰는 직접 입력: 음성 스레드는 순서대로 처리하므로 이 재생보다 앞선 재생이 있으면 먼저 나온다.
-    p.submit_text("표시용 문장")
-    first = player.played.get(timeout=TIMEOUT)
-    if read_aloud:
-        assert first == ("clips", ["mn|mn:실시간 강의 문장입니다".encode()])
-        first = player.played.get(timeout=TIMEOUT)
-    assert first == ("clips", ["mn|mn:표시용 문장".encode()])
+    with pytest.raises(queue.Empty):
+        player.played.get(timeout=0.3)
+    assert speaker.calls == []
+
+
+def live_sentences(pipes, router, langs, sentences):
+    script = [[("final", s)] for s in sentences]
+    p, *_, mics = pipes(script, router=router, settings=FakeSettings(langs=langs))
+    p.start_live()
+    for _ in sentences:
+        feed(mics[0])
+    return p
 
 
 def test_quota_status_only_once(pipes):
-    router = FakeRouter(reason="quota", fell_back=True)
-    p, *_ = pipes(router=router, settings=FakeSettings(langs=["mn", "zh"]))
-    p.submit_text("첫 문장")
-    p.submit_text("둘째 문장")
+    p = live_sentences(pipes, FakeRouter(reason="quota", fell_back=True), ["mn", "zh"],
+                       ["첫 번째 문장입니다", "두 번째 문장입니다"])
     seen = []
     while sum(isinstance(e, Translation) for e in seen) < 4:
         seen.append(next_event(p))
-    statuses = [e for e in seen if isinstance(e, Status)]
-    assert [s.kind for s in statuses] == ["quota"]
+    assert [s.kind for s in seen if isinstance(s, Status)] == ["quota"]
 
 
 def test_fallback_status(pipes):
-    p, *_ = pipes(router=FakeRouter(reason="error", fell_back=True), settings=FakeSettings(langs=["mn"]))
-    p.submit_text("문장")
+    p = live_sentences(pipes, FakeRouter(reason="error", fell_back=True), ["mn"], ["대체 번역 문장입니다"])
     kinds = [type(next_event(p)).__name__ for _ in range(3)]
     assert kinds == ["Final", "Translation", "Status"]
 
@@ -251,48 +227,45 @@ def test_mic_open_failure(pipes):
     assert not p.live
 
 
-def test_offline_speak_does_not_call_speaker(pipes):
-    settings = FakeSettings(online=False, langs=["mn"])
-    p, _, speaker, player, _ = pipes(settings=settings)
-    p.speak({"mn": "오프라인"})
-    p.set_online(True)
-    p.speak({"mn": "온라인"})
-    assert player.played.get(timeout=TIMEOUT) == ("clips", [b"mn|\xec\x98\xa8\xeb\x9d\xbc\xec\x9d\xb8"])
-    assert speaker.calls == [("온라인", "mn")]
+def test_phrase_offline_does_not_synthesize(pipes, tmp_path):
+    p, _, speaker, player, _ = pipes(settings=FakeSettings(online=False, langs=["mn"]),
+                                     audio_path=lambda ph, lang: tmp_path / f"{ph.key}_{lang}.mp3")
+    p.play_phrase(FakePhrase("p1", "집중하세요", {"mn": "M"}))
+    with pytest.raises(queue.Empty):
+        player.played.get(timeout=0.3)
+    assert speaker.calls == []
 
 
-def test_speak_uses_target_order_and_enabled_langs(pipes):
-    p, _, speaker, player, _ = pipes(settings=FakeSettings(langs=["zh", "mn"]))
-    p.speak({"en": "E", "zh": "Z", "mn": "M"})
+def test_phrase_synth_uses_target_order(pipes, tmp_path):
+    p, _, speaker, player, _ = pipes(settings=FakeSettings(langs=["zh", "mn"]),
+                                     audio_path=lambda ph, lang: tmp_path / f"{ph.key}_{lang}.mp3")
+    p.play_phrase(FakePhrase("p1", "집중하세요", {"en": "E", "zh": "Z", "mn": "M"}))
     assert player.played.get(timeout=TIMEOUT) == ("clips", [b"mn|M", b"zh|Z"])
 
 
-def test_tts_error_becomes_status(pipes):
-    p, _, speaker, player, _ = pipes(settings=FakeSettings(langs=["mn"]))
-
-    class TtsError(Exception):
-        pass
+def test_tts_error_becomes_status(pipes, tmp_path):
+    p, _, speaker, player, _ = pipes(settings=FakeSettings(langs=["mn"]),
+                                     audio_path=lambda ph, lang: tmp_path / f"{ph.key}_{lang}.mp3")
 
     def boom(text, lang):
-        raise TtsError("네트워크")
+        raise RuntimeError("네트워크")
 
     speaker.synth = boom
-    p.speak({"mn": "M"})
+    p.play_phrase(FakePhrase("p1", "집중하세요", {"mn": "M"}))
     ev = next_event(p)
     assert isinstance(ev, Status) and ev.kind == "tts_error"
 
 
-def test_audio_error_becomes_status(pipes):
-    p, _, speaker, player, _ = pipes(settings=FakeSettings(langs=["mn"]))
+def test_audio_error_becomes_status(pipes, tmp_path):
+    (tmp_path / "p1_mn.mp3").write_bytes(b"ID3")
+    p, _, speaker, player, _ = pipes(settings=FakeSettings(langs=["mn"]),
+                                     audio_path=lambda ph, lang: tmp_path / f"{ph.key}_{lang}.mp3")
 
-    class AudioError(Exception):
-        pass
+    def boom(paths):
+        raise RuntimeError("장치 없음")
 
-    def boom(clips):
-        raise AudioError("장치 없음")
-
-    player.play = boom
-    p.speak({"mn": "M"})
+    player.play_files = boom
+    p.play_phrase(FakePhrase("p1", "집중하세요", {"mn": "M"}))
     ev = next_event(p)
     assert isinstance(ev, Status) and ev.kind == "audio_error"
 
@@ -332,11 +305,6 @@ def test_stop_live_flushes_pending(pipes):
     assert not p.live and rec.finished and mics[0].stopped
     ev = next_event(p)
     assert isinstance(ev, Final) and ev.ko == "짧은 말"
-
-
-def test_translate_once(pipes):
-    p, *_ = pipes(settings=FakeSettings(langs=["zh", "mn"]))
-    assert p.translate_once("안녕") == {"mn": "mn:안녕", "zh": "zh:안녕"}
 
 
 def test_shutdown_stops_threads_within_1s():
