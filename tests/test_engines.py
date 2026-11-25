@@ -61,3 +61,36 @@ def test_model_manager_keeps_one_loaded():
 def test_model_manager_unknown():
     with pytest.raises(KeyError):
         ModelManager({}).get("hymt")
+
+
+def test_make_router_online_engine(tmp_path):
+    from sukpago.engines import make_router
+    r = make_router("me@example.com", tmp_path / "models")
+    assert r._online.name == "MyMemory"
+    assert r._online.email == "me@example.com"
+    assert r._offline_for == {"mn": "nllb600", "zh": "nllb600", "en": "nllb600"}
+
+
+def test_make_router_offline_engine_is_lazy(tmp_path, monkeypatch):
+    from sukpago import engines
+    from sukpago.translate import nllb
+
+    made = []
+
+    class FakeNllb:
+        name = "NLLB-600M"
+
+        def __init__(self, model_dir):
+            made.append(model_dir)
+
+        def translate(self, text, lang):
+            return f"nllb:{lang}:{text}"
+
+    monkeypatch.setattr(nllb, "NllbTranslator", FakeNllb)
+    r = engines.make_router("me@example.com", tmp_path / "models")
+    assert made == [] and r._models.active_name is None
+    res = r.translate("안녕", "mn", online=False)
+    assert res.text == "nllb:mn:안녕" and res.engine == "NLLB-600M"
+    assert made == [tmp_path / "models" / "nllb-600m"]
+    r.translate("안녕", "zh", online=False)
+    assert len(made) == 1
