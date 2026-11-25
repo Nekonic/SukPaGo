@@ -1,4 +1,4 @@
-"""석파고 한 줄 실행. 표준 라이브러리만 쓰므로 Python 3.10 이상이면 무엇으로 실행해도 된다.
+"""석파고 한 줄 실행. 표준 라이브러리만 쓰므로 Python 3.8 이상이면 무엇으로 실행해도 된다.
 
     python run.py          # 환경·모델·고정 문장 음성을 준비하고 앱 실행
     python run.py setup    # 준비만 하고 실행은 안 함
@@ -6,8 +6,8 @@
 
 import sys
 
-if sys.version_info < (3, 10):
-    sys.stderr.write("Python 3.10 이상이 필요합니다. 지금 버전: %d.%d\n" % sys.version_info[:2])
+if sys.version_info < (3, 8):
+    sys.stderr.write("Python 3.8 이상이 필요합니다. 지금 버전: %d.%d\n" % sys.version_info[:2])
     sys.exit(1)
 
 import os  # noqa: E402
