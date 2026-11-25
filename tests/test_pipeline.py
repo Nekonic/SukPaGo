@@ -349,3 +349,21 @@ def test_asr_crash_reports_and_stops_mic(pipes):
     assert not p.live and mics[0].stopped
     p.start_live()  # 다시 시작하면 새 마이크 하나만 열린다
     assert len(mics) == 2 and mics[1].started
+
+
+class SlowRouter(FakeRouter):
+    def translate(self, text, lang, *, online):
+        time.sleep(0.3)
+        return super().translate(text, lang, online=online)
+
+
+def test_languages_are_translated_in_parallel_but_emitted_in_order(pipes):
+    p, *_, mics = pipes([[("final", "세 언어로 동시에 번역할 문장")]], router=SlowRouter(),
+                        settings=FakeSettings(langs=["mn", "zh", "en"]))
+    p.start_live()
+    feed(mics[0])
+    assert isinstance(next_event(p), Final)
+    t0 = time.monotonic()
+    langs = [next_event(p).lang for _ in range(3)]
+    assert langs == ["mn", "zh", "en"]
+    assert time.monotonic() - t0 < 0.75  # 차례로 하면 0.9초 이상

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import queue
+from concurrent.futures import ThreadPoolExecutor
 import threading
 import time
 from collections.abc import Callable
@@ -100,6 +101,8 @@ class Pipeline:
         self._asr_thread: threading.Thread | None = None
         self._assembler: SentenceAssembler | None = None
 
+        # 켜진 언어를 동시에 번역한다(MyMemory 요청이 언어당 약 1초라 차례로 하면 2초 목표를 넘음).
+        self._lang_pool = ThreadPoolExecutor(max_workers=len(TARGET_ORDER), thread_name_prefix="pipeline-lang")
         self._trans_q: queue.Queue = queue.Queue()
         self._speech_q: queue.Queue = queue.Queue()
         self._trans_thread = threading.Thread(target=self._translate_loop, name="pipeline-translate",
@@ -264,9 +267,12 @@ class Pipeline:
             seq, ko, source = item
             online = self._online()
             fallback_reason: str | None = None
-            for lang in self._langs():
+            langs = self._langs()
+            futures = [self._lang_pool.submit(self._router.translate, ko, lang, online=online)
+                       for lang in langs]
+            for lang, fut in zip(langs, futures):  # 끝난 순서와 상관없이 정해진 순서로 낸다
                 try:
-                    r = self._router.translate(ko, lang, online=online)
+                    r = fut.result()
                 except Exception as e:
                     self._emit(Status("info", f"번역하지 못했습니다({lang}): {e}"))
                     continue
@@ -357,3 +363,4 @@ class Pipeline:
             pass
         for t in (self._trans_thread, self._speech_thread):
             t.join(0.5)
+        self._lang_pool.shutdown(wait=False, cancel_futures=True)
