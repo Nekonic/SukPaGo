@@ -199,3 +199,16 @@ def test_mic_level_bar(app):
     pipeline.events.put(MicLevel(-30.0, "ok"))
     drain(a)
     assert abs(a.mic_bar.get() - 0.5) < 0.01
+
+
+def test_display_font_slider_and_buttons(app):
+    a, pipeline, config = app
+    a.open_display()
+    d = a.display
+    d._slide(80.4)
+    assert d.font_px == 80 and a.settings.display_font_px == 80
+    assert round(d.slider.get()) == 80
+    d._step(1)
+    assert d.font_px == 88 and round(d.slider.get()) == 88
+    d._slide(500)
+    assert d.font_px == 120

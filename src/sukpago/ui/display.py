@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 from ..languages import TARGET_ORDER
 from . import theme
-from .layout import clamp_font, ordered_texts, step_font
+from .layout import FONT_MAX, FONT_MIN, clamp_font, ordered_texts, step_font
 
 
 class DisplayWindow(ctk.CTkToplevel):
@@ -27,11 +27,14 @@ class DisplayWindow(ctk.CTkToplevel):
 
         bar = ctk.CTkFrame(self, fg_color=theme.BG)
         bar.pack(side="top", fill="x", padx=8, pady=(4, 0))
-        for label, delta in (("A+", 1), ("A−", -1)):
-            ctk.CTkButton(bar, text=label, width=44, height=36, fg_color=theme.BUTTON,
-                          hover_color=theme.BUTTON_HOVER, text_color=theme.TEXT, border_width=1,
-                          border_color=theme.BORDER,
-                          command=lambda d=delta: self._step(d)).pack(side="right", padx=(4, 0))
+        self._font_button(bar, "A+", 1).pack(side="right", padx=(4, 0))
+        self.slider = ctk.CTkSlider(bar, from_=FONT_MIN, to=FONT_MAX,
+                                    number_of_steps=(FONT_MAX - FONT_MIN) // 4, width=200,
+                                    button_color=theme.ACCENT, progress_color=theme.ACCENT,
+                                    command=self._slide)
+        self.slider.set(self._font_px)
+        self.slider.pack(side="right", padx=(4, 0))
+        self._font_button(bar, "A−", -1).pack(side="right")
 
         self.text = tk.Text(self, wrap="word", bd=0, highlightthickness=0, padx=8, pady=0,
                             bg=theme.BG, fg=theme.TEXT, cursor="arrow", spacing1=0, spacing3=0)
@@ -43,10 +46,25 @@ class DisplayWindow(ctk.CTkToplevel):
         for lang in TARGET_ORDER:
             self.text.tag_configure(lang, font=(theme.family_for(lang), self._font_px, "bold"))
 
+    def _font_button(self, parent, label: str, delta: int) -> ctk.CTkButton:
+        return ctk.CTkButton(parent, text=label, width=44, height=36, fg_color=theme.BUTTON,
+                             hover_color=theme.BUTTON_HOVER, text_color=theme.TEXT, border_width=1,
+                             border_color=theme.BORDER, command=lambda: self._step(delta))
+
     def _step(self, delta: int) -> None:
-        self._font_px = step_font(self._font_px, delta)
+        self.set_font(step_font(self._font_px, delta))
+
+    def _slide(self, value: float) -> None:
+        self.set_font(round(value))
+
+    def set_font(self, px: int) -> None:
+        px = clamp_font(px)
+        if px == self._font_px:
+            return
+        self._font_px = px
+        self.slider.set(px)
         self._configure_tags()
-        self._on_font_change(self._font_px)
+        self._on_font_change(px)
 
     @property
     def font_px(self) -> int:
