@@ -22,8 +22,8 @@ from sukpago.quality import has_repetition, has_traditional_mongolian, is_cyrill
 from sukpago.text.assembler import SentenceAssembler
 
 ASR_CANDIDATES = ("zipformer", "sensevoice", "qwen3", "qwen3_hw")
-MT_CANDIDATES = ("nllb600", "nllb13", "nllb13_pivot", "tsengel13", "tsengel13_pivot", "tgemma", "tgemma_pivot")
-COMBOS = tuple((a, m) for a in ("zipformer", "qwen3") for m in ("nllb13", "tsengel13", "tgemma"))
+MT_CANDIDATES = ("nllb600", "nllb13", "nllb13_pivot", "tsengel13", "tsengel13_pivot")
+COMBOS = tuple((a, m) for a in ("zipformer", "qwen3") for m in ("nllb13", "tsengel13"))
 STEP = SAMPLE_RATE // 10  # 마이크처럼 0.1초씩 넣는다
 BUDGET_MB = 3500  # 4GB에서 TTS·화면 몫 약 0.5GB를 뺀 값
 EVAL_HOTWORDS = ("NotebookLM", "할루시네이션", "PDF", "YouTube", "Claude", "Gemini")
@@ -44,14 +44,10 @@ def make_asr(name: str):
 
 def make_mt(name: str):
     m = paths.models_dir()
+    from sukpago.translate.nllb import NllbTranslator
     from sukpago.translate.pivot import PivotTranslator
-    if name.startswith("tgemma"):
-        from sukpago.translate.gemma import TranslateGemmaTranslator
-        engine = TranslateGemmaTranslator(m / "tgemma" / "translategemma-4b-it.Q4_K_M.gguf")
-    else:
-        from sukpago.translate.nllb import NllbTranslator
-        folder = {"nllb600": "nllb-600m", "nllb13": "nllb-1.3b", "tsengel13": "tsengel-1.3b"}
-        engine = NllbTranslator(m / folder[name.removesuffix("_pivot")])
+    folder = {"nllb600": "nllb-600m", "nllb13": "nllb-1.3b", "tsengel13": "tsengel-1.3b"}
+    engine = NllbTranslator(m / folder[name.removesuffix("_pivot")])
     return PivotTranslator(engine, name=name) if name.endswith("_pivot") else engine
 
 

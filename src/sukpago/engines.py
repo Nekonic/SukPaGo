@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from .languages import TARGET_ORDER
 from .translate.base import Translator, Unloadable
+
+if TYPE_CHECKING:
+    from .translate.router import TranslateRouter
 
 ASR_ENGINES = ("zipformer", "sensevoice")
 MT_ENGINES = ("hymt", "nllb")
@@ -64,3 +67,15 @@ class ModelManager:
             self._active.unload()
         self._active = None
         self._active_name = None
+
+
+def make_router(email: str, models_dir: Path) -> TranslateRouter:
+    """앱이 쓰는 라우터: 온라인 MyMemory, 대체는 세 언어 모두 NLLB-600M(처음 쓸 때 만든다)."""
+    from .translate import nllb
+    from .translate.mymemory import MyMemoryTranslator
+    from .translate.router import TranslateRouter
+
+    nllb_dir = Path(models_dir) / "nllb-600m"
+    models = ModelManager({"nllb600": lambda: nllb.NllbTranslator(nllb_dir)})
+    return TranslateRouter(MyMemoryTranslator(email), models,
+                           {lang: "nllb600" for lang in TARGET_ORDER})
