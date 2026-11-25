@@ -7,14 +7,16 @@ dependencies = [
   "numpy>=2.1",
   "ctranslate2==4.9.1",
   "sentencepiece==0.2.3",
-  "llama-cpp-python==0.3.38",
   "sherpa-onnx==1.13.8",
   "sherpa-onnx-core==1.13.8",
   "psutil>=6.0",
+  "customtkinter>=5.2",
+  "miniaudio>=1.61",
+  "edge-tts>=7.0",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.3"]
+dev = ["pytest>=8.3", "pyinstaller>=6.10"]
 
 [build-system]
 requires = ["hatchling"]
@@ -27,11 +29,3 @@ packages = ["src/sukpago"]
 testpaths = ["tests"]
 pythonpath = ["tools"]
 markers = ["models: models/ 폴더의 실제 모델이 필요함 (없으면 건너뜀)"]
-
-[[tool.uv.index]]
-name = "llama-cpp-cpu"
-url = "https://abetlen.github.io/llama-cpp-python/whl/cpu"
-explicit = true
-
-[tool.uv.sources]
-llama-cpp-python = [{ index = "llama-cpp-cpu", marker = "sys_platform == 'win32'" }]
