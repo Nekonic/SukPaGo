@@ -1,5 +1,5 @@
 from sukpago.languages import TARGET_ORDER
-from sukpago.ui.layout import FONT_MAX, FONT_MIN, clamp_font, ordered_texts, step_font
+from sukpago.ui.layout import FONT_MAX, FONT_MIN, clamp_font, level_fraction, ordered_texts, step_font
 
 
 def test_clamp_font():
@@ -23,3 +23,10 @@ def test_ordered_texts_uses_enabled_langs_in_fixed_order():
 def test_ordered_texts_skips_missing_translations():
     assert ordered_texts({"mn": "M"}, ["mn", "zh"], TARGET_ORDER) == [("mn", "M")]
     assert ordered_texts({}, ["mn"], TARGET_ORDER) == []
+
+
+def test_level_fraction():
+    assert level_fraction(-120) == 0.0
+    assert level_fraction(-60) == 0.0
+    assert level_fraction(-30) == 0.5
+    assert level_fraction(3) == 1.0

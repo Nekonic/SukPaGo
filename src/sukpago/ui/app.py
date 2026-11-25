@@ -11,8 +11,7 @@ import customtkinter as ctk
 from ..languages import TARGET_ORDER, get
 from . import theme
 from .display import DisplayWindow
-from .glossary import GlossaryWindow
-from .layout import MAX_HISTORY, ordered_texts
+from .layout import MAX_HISTORY, level_fraction, ordered_texts
 
 if TYPE_CHECKING:
     from ..config import Settings
@@ -63,7 +62,6 @@ class App(ctk.CTk):
                             ).pack(side="left", padx=(16, 0))
             self.lang_vars[lang] = var
         self._plain_button(top, "번역 창", self.open_display).pack(side="right")
-        self._plain_button(top, "용어 고치기", self.open_glossary).pack(side="right", padx=(0, 8))
 
         live = ctk.CTkFrame(self, fg_color=theme.BG)
         live.pack(fill="x", padx=16, pady=6)
@@ -71,6 +69,9 @@ class App(ctk.CTk):
                                          fg_color=theme.ACCENT, hover_color=theme.ACCENT_HOVER,
                                          font=ctk.CTkFont(theme.FONT_KO, 16, "bold"))
         self.live_button.pack(side="left")
+        self.mic_bar = ctk.CTkProgressBar(live, width=90, height=8, progress_color=theme.MIC_COLORS["ok"])
+        self.mic_bar.set(0)
+        self.mic_bar.pack(side="left", padx=(10, 0))
         self.partial = ctk.CTkLabel(live, text="", text_color=theme.MUTED, anchor="w",
                                     font=ctk.CTkFont(theme.FONT_KO, 16))
         self.partial.pack(side="left", fill="x", expand=True, padx=12)
@@ -99,12 +100,27 @@ class App(ctk.CTk):
             b.pack(side="left", fill="x", expand=True, padx=(0, 6))
             self.phrase_buttons.append(b)
 
+        terms = ctk.CTkFrame(self, fg_color=theme.BG)
+        terms.pack(fill="x", padx=16, pady=(6, 0))
+        ctk.CTkLabel(terms, text="용어 고치기", text_color=theme.TEXT,
+                     font=ctk.CTkFont(theme.FONT_KO, 13, "bold")).pack(side="left")
+        self.term_wrong = ctk.CTkEntry(terms, width=150, placeholder_text="인식된 말")
+        self.term_right = ctk.CTkEntry(terms, width=150, placeholder_text="바꿀 말")
+        self.term_wrong.pack(side="left", padx=(8, 0))
+        ctk.CTkLabel(terms, text="→", text_color=theme.MUTED).pack(side="left", padx=4)
+        self.term_right.pack(side="left")
+        self.term_right.bind("<Return>", lambda _e: self.add_term())
+        self._plain_button(terms, "추가", self.add_term, width=56).pack(side="left", padx=(6, 0))
+        self.term_list = ctk.CTkScrollableFrame(terms, orientation="horizontal", height=30, fg_color=theme.BG)
+        self.term_list.pack(side="left", fill="x", expand=True, padx=(8, 0))
+        self._render_terms()
+
         self.status = ctk.CTkLabel(self, text="", text_color=theme.WARN, anchor="w",
                                    font=ctk.CTkFont(theme.FONT_KO, 13))
         self.status.pack(fill="x", padx=16, pady=(0, 8))
 
-    def _plain_button(self, parent, text, command) -> ctk.CTkButton:
-        return ctk.CTkButton(parent, text=text, width=96, height=32, command=command, fg_color=theme.BUTTON,
+    def _plain_button(self, parent, text, command, width=96) -> ctk.CTkButton:
+        return ctk.CTkButton(parent, text=text, width=width, height=32, command=command, fg_color=theme.BUTTON,
                              hover_color=theme.BUTTON_HOVER, text_color=theme.TEXT, border_width=1,
                              border_color=theme.BORDER)
 
@@ -151,6 +167,7 @@ class App(ctk.CTk):
             self.live_button.configure(text="🎤 시작", fg_color=theme.ACCENT, hover_color=theme.ACCENT_HOVER,
                                        state="normal")
             self.partial.configure(text="")
+            self.mic_bar.set(0)
 
     def say_phrase(self, phrase) -> None:
         self._local_seq -= 1
@@ -177,12 +194,34 @@ class App(ctk.CTk):
         self._config.save_settings(self.settings)
         self.display = None
 
-    def open_glossary(self) -> None:
-        GlossaryWindow(self, self.glossary, self._glossary_changed)
+    def _render_terms(self) -> None:
+        for w in self.term_list.winfo_children():
+            w.destroy()
+        self.term_buttons = []
+        for rule in self.glossary.rules:
+            b = self._plain_button(self.term_list, f"{rule.wrong} → {rule.right}  ✕",
+                                   lambda w=rule.wrong: self.remove_term(w), width=0)
+            b.configure(height=26)
+            b.pack(side="left", padx=(0, 4))
+            self.term_buttons.append(b)
 
-    def _glossary_changed(self, g) -> None:
-        self._config.save_glossary(g)
-        self.pipeline.set_glossary(g)
+    def add_term(self) -> None:
+        try:
+            self.glossary.add(self.term_wrong.get(), self.term_right.get())
+        except ValueError:
+            return
+        self.term_wrong.delete(0, "end")
+        self.term_right.delete(0, "end")
+        self._glossary_changed()
+
+    def remove_term(self, wrong: str) -> None:
+        self.glossary.remove(wrong)
+        self._glossary_changed()
+
+    def _glossary_changed(self) -> None:
+        self._config.save_glossary(self.glossary)
+        self.pipeline.set_glossary(self.glossary)
+        self._render_terms()
 
     def quit_app(self) -> None:
         if self.display is not None and self.display.winfo_exists():
@@ -213,6 +252,9 @@ class App(ctk.CTk):
             self._new_sentence(ev.seq, ev.ko)
         elif kind == "Translation":
             self._add_translation(ev.seq, ev.lang, ev.text)
+        elif kind == "MicLevel":
+            self.mic_bar.set(level_fraction(ev.dbfs))
+            self.mic_bar.configure(progress_color=theme.MIC_COLORS.get(ev.state, theme.MUTED))
         elif kind == "Status":
             self.status.configure(text=ev.message)
             self._sticky_status = ev.kind == "quota"

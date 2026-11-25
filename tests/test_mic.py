@@ -210,22 +210,3 @@ def test_mic_callback_error_does_not_kill_capture():
     assert len(got) == 2
 
 
-# list_devices
-
-
-def test_list_devices_failure_returns_empty(monkeypatch):
-    class Broken:
-        def __init__(self, *a, **k):
-            raise RuntimeError("no backend")
-
-    monkeypatch.setattr(mic.miniaudio, "Devices", Broken)
-    assert mic.list_devices() == []
-
-
-def test_list_devices_names(monkeypatch):
-    class Fake:
-        def get_captures(self):
-            return CAPS
-
-    monkeypatch.setattr(mic.miniaudio, "Devices", Fake)
-    assert mic.list_devices() == [c["name"] for c in CAPS]

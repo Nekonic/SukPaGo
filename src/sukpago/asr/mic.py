@@ -21,15 +21,6 @@ class MicError(Exception):
     pass
 
 
-def list_devices() -> list[str]:
-    """캡처 장치 이름 목록. 실패하면 []."""
-    try:
-        return [str(d["name"]) for d in miniaudio.Devices().get_captures()]
-    except Exception:
-        log.exception("마이크 목록을 읽지 못했습니다")
-        return []
-
-
 def level(samples: np.ndarray) -> tuple[float, float]:
     """(dBFS, |x|>=0.99인 샘플 비율). 빈 배열이나 무음은 (-120.0, 0.0)."""
     x = np.asarray(samples, dtype=np.float32)

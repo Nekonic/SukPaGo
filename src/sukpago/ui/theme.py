@@ -15,6 +15,7 @@ BORDER = "#C9D1DC"
 WARN = "#9A5B00"      # 안내 문구
 RED = "#C62828"       # 듣는 중 버튼
 RED_HOVER = "#A61F1F"
+MIC_COLORS = {"ok": "#137A45", "quiet": WARN, "silent": WARN, "loud": RED}  # 마이크 소리 막대 색
 
 if sys.platform == "win32":
     FONT_KO, FONT_ZH, FONT_LATIN = "Malgun Gothic", "Microsoft YaHei", "Segoe UI"

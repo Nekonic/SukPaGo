@@ -10,7 +10,7 @@ import pytest
 
 ctk = pytest.importorskip("customtkinter")
 
-from sukpago.text.glossary import Glossary, Rule  # noqa: E402
+from sukpago.text.glossary import Glossary  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,12 @@ class Translation:
     engine: str = "MyMemory"
     fell_back: bool = False
     reason: str | None = None
+
+
+@dataclass(frozen=True)
+class MicLevel:
+    dbfs: float
+    state: str
 
 
 @dataclass(frozen=True)
@@ -175,9 +181,21 @@ def test_status_quota_stays_other_clears(app):
     assert a.status.cget("text") == "오늘 번역 한도 초과"
 
 
-def test_glossary_change_saves_and_updates_pipeline(app):
+def test_terms_add_and_remove_inline(app):
     a, pipeline, config = app
-    g = Glossary([Rule("노트북 에램", "NotebookLM")])
-    a._glossary_changed(g)
-    assert config.glossary_saved is g
-    assert ("glossary", g) in pipeline.calls
+    a.term_wrong.insert(0, "노트북 에램")
+    a.term_right.insert(0, "NotebookLM")
+    a.add_term()
+    assert [r.wrong for r in a.glossary.rules] == ["노트북 에램"]
+    assert config.glossary_saved is a.glossary
+    assert ("glossary", a.glossary) in pipeline.calls
+    assert len(a.term_buttons) == 1 and a.term_wrong.get() == ""
+    a.term_buttons[0].invoke()
+    assert a.glossary.rules == [] and a.term_buttons == []
+
+
+def test_mic_level_bar(app):
+    a, pipeline, _ = app
+    pipeline.events.put(MicLevel(-30.0, "ok"))
+    drain(a)
+    assert abs(a.mic_bar.get() - 0.5) < 0.01

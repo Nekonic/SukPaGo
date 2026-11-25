@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from sukpago.asr.base import AsrEvent
-from sukpago.pipeline import Final, Partial, Pipeline, Status, Translation
+from sukpago.pipeline import Final, MicLevel, Partial, Pipeline, Status, Translation
 from sukpago.text.glossary import Glossary, Rule
 
 TIMEOUT = 2
@@ -150,8 +150,11 @@ def pipes():
         p.shutdown()
 
 
-def next_event(p):
-    return p.events.get(timeout=TIMEOUT)
+def next_event(p, skip=(MicLevel,)):
+    while True:
+        ev = p.events.get(timeout=TIMEOUT)
+        if not isinstance(ev, skip):
+            return ev
 
 
 def feed(mic):
@@ -171,6 +174,14 @@ def test_live_partial_final_translations_in_order(pipes):
     assert isinstance(t1, Translation) and isinstance(t2, Translation)
     assert (t1.seq, t1.lang, t1.text) == (final.seq, "mn", "mn:오늘은 광합성을 배울 거예요")
     assert (t2.seq, t2.lang) == (final.seq, "zh")
+
+
+def test_mic_level_emitted(pipes):
+    p, *_, mics = pipes()
+    p.start_live()
+    feed(mics[0])
+    ev = p.events.get(timeout=TIMEOUT)
+    assert isinstance(ev, MicLevel) and ev.state == "silent"
 
 
 def test_filler_only_final_makes_no_final(pipes):

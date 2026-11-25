@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from .asr.base import Recognizer
+from .asr.mic import classify, level
 from .languages import TARGET_ORDER
 from .text.assembler import SentenceAssembler
 from .text.glossary import Glossary
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
     from .tts.base import Speaker
 
 TICK_S = 0.1
+LEVEL_EVERY_S = 0.2
 DELAY_AT = 3
 _STOP = object()
 
@@ -55,6 +57,12 @@ class Translation:
 class Status:
     kind: str  # "mic_error" | "fallback" | "quota" | "tts_error" | "audio_error" | "delay" | "info"
     message: str
+
+
+@dataclass(frozen=True)
+class MicLevel:
+    dbfs: float
+    state: str  # asr.mic.classify 결과: "ok" | "quiet" | "silent" | "loud"
 
 
 def _default_audio_path(phrase: Phrase, lang: str) -> Path:
@@ -173,6 +181,7 @@ class Pipeline:
         assert assembler is not None
         last_partial = ""
         last_tick = self._clock()
+        last_level = None
 
         def handle(events) -> None:
             nonlocal last_partial
@@ -193,6 +202,11 @@ class Pipeline:
             if item is _STOP:
                 break
             if item is not None:
+                now = self._clock()
+                if last_level is None or now - last_level >= LEVEL_EVERY_S:
+                    last_level = now
+                    dbfs, clip = level(item)
+                    self._emit(MicLevel(dbfs, classify(dbfs, clip)))
                 handle(recognizer.accept(item))
             now = self._clock()
             if item is None or now - last_tick >= TICK_S:
@@ -211,7 +225,7 @@ class Pipeline:
         handle(recognizer.finish())
         self._finals(assembler.flush(), "live")
 
-    # ---- 직접 입력과 번역 ----
+    # ---- 번역 ----
 
     def _finals(self, sentences: list[str], source: str) -> None:
         for s in sentences:
