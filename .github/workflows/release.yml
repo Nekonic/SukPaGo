@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          enable-cache: true
+
+      - name: 모델 캐시
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: models
+          key: models-${{ hashFiles('tools/models.lock.json') }}
+
+      - name: 환경·모델·고정 문장 음성 준비 (run.py 검증 겸)
+        run: python run.py setup
+
+      - name: 스모크 테스트 (실제 모델, 최대 메모리 2GB)
+        run: uv run python tools/smoke.py --max-mb 2048
+
+      - name: exe 빌드
+        run: uv run pyinstaller --noconfirm --clean packaging/sukpago.spec
+
+      - name: 배포 폴더 채우기
+        shell: pwsh
+        run: |
+          $d = "dist/SukPaGo"
+          New-Item -ItemType Directory -Force "$d/models", "$d/tools" | Out-Null
+          Copy-Item -Recurse -Force models/zipformer-ko, models/nllb-600m "$d/models/"
+          Copy-Item -Recurse -Force assets "$d/assets"
+          Copy-Item -Force tools/models.lock.json "$d/tools/"
+          Copy-Item -Force THIRD_PARTY_NOTICES.txt, README.md $d
+
+      - name: zip 만들기 (2GB 이하 확인)
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "dev-$($env:GITHUB_SHA.Substring(0, 7))" }
+          $zip = "SukPaGo-$ver-win64.zip"
+          7z a -tzip -mx=5 $zip ./dist/SukPaGo | Out-Null
+          $size = (Get-Item $zip).Length
+          Write-Host "$zip $([math]::Round($size / 1MB)) MB"
+          if ($size -gt 2GB) { throw "zip이 2GB를 넘습니다: $size" }
+          "ZIP=$zip" >> $env:GITHUB_ENV
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ env.ZIP }}
+          path: ${{ env.ZIP }}
+          compression-level: 0
+
+      - name: Release에 첨부
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          files: ${{ env.ZIP }}
