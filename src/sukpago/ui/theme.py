@@ -13,8 +13,10 @@ BUTTON = "#F5F7FA"    # 빠른 안내 버튼
 BUTTON_HOVER = "#E6EEFC"
 BORDER = "#C9D1DC"
 WARN = "#9A5B00"      # 안내 문구
-RED = "#C62828"       # 듣는 중 버튼
+RED = "#C62828"       # 녹음 시작 버튼
 RED_HOVER = "#A61F1F"
+STOP = "#3D4654"      # 녹음 중(멈추기) 버튼
+STOP_HOVER = "#2A303A"
 MIC_COLORS = {"ok": "#137A45", "quiet": WARN, "silent": WARN, "loud": RED}  # 마이크 소리 막대 색
 
 if sys.platform == "win32":

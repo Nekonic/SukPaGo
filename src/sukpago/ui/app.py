@@ -65,8 +65,8 @@ class App(ctk.CTk):
 
         live = ctk.CTkFrame(self, fg_color=theme.BG)
         live.pack(fill="x", padx=16, pady=6)
-        self.live_button = ctk.CTkButton(live, text="🎤 시작", width=120, height=44, command=self.toggle_live,
-                                         fg_color=theme.ACCENT, hover_color=theme.ACCENT_HOVER,
+        self.live_button = ctk.CTkButton(live, text="● 녹음 시작", width=130, height=44, command=self.toggle_live,
+                                         fg_color=theme.RED, hover_color=theme.RED_HOVER, text_color="#FFFFFF",
                                          font=ctk.CTkFont(theme.FONT_KO, 16, "bold"))
         self.live_button.pack(side="left")
         self.mic_bar = ctk.CTkProgressBar(live, width=90, height=8, progress_color=theme.MIC_COLORS["ok"])
@@ -161,10 +161,10 @@ class App(ctk.CTk):
 
     def _sync_live_button(self) -> None:
         if self.pipeline.live:
-            self.live_button.configure(text="■ 멈추기", fg_color=theme.RED, hover_color=theme.RED_HOVER,
+            self.live_button.configure(text="■ 멈추기", fg_color=theme.STOP, hover_color=theme.STOP_HOVER,
                                        state="normal")
         else:
-            self.live_button.configure(text="🎤 시작", fg_color=theme.ACCENT, hover_color=theme.ACCENT_HOVER,
+            self.live_button.configure(text="● 녹음 시작", fg_color=theme.RED, hover_color=theme.RED_HOVER,
                                        state="normal")
             self.partial.configure(text="")
             self.mic_bar.set(0)
