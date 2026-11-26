@@ -230,3 +230,6 @@ eval_out*/
 
 # 고정 문장 음성은 tools/build_phrase_audio.py로 만든다
 assets/phrases/*.mp3
+
+# macOS
+.DS_Store
