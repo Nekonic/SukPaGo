@@ -72,7 +72,8 @@ class DisplayWindow(ctk.CTkToplevel):
 
     def show(self, history: list[dict[str, str]], langs: list[str]) -> None:
         """기록 전체를 다시 그린다. 맨 아래를 보고 있을 때만 맨 아래로 따라간다."""
-        follow = self.text.yview()[1] >= 0.999
+        top, bottom = self.text.yview()
+        follow = bottom >= 0.999
         self._history, self._langs = history, langs
         self.text.configure(state="normal")
         self.text.delete("1.0", "end")
@@ -82,6 +83,8 @@ class DisplayWindow(ctk.CTkToplevel):
         self.text.configure(state="disabled")
         if follow:
             self.text.see("end")
+        else:
+            self.text.yview_moveto(top)  # 위로 스크롤해 둔 자리를 지킨다
 
     def close(self) -> None:
         self._on_close(self.geometry())

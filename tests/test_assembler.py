@@ -61,3 +61,10 @@ def test_very_long_piece_without_endings_is_wrapped_at_spaces():
 def test_glossary_applied():
     a = SentenceAssembler(Glossary([Rule("노트북 에램", "NotebookLM")]))
     assert a.feed("노트북 에램 이라는 사이트가 있어요", 0) == ["NotebookLM 이라는 사이트가 있어요"]
+
+
+def test_numbers_and_latin_are_not_collapsed():
+    a = SentenceAssembler()
+    assert a.clean("전화번호는 121212 이고 202020 입니다") == "전화번호는 121212 이고 202020 입니다"
+    assert a.clean("bookbookbook 은 그대로") == "bookbookbook 은 그대로"
+    assert a.clean("여러분러분 안녕하세요") == "여러분 안녕하세요"

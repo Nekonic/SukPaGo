@@ -11,7 +11,7 @@ import customtkinter as ctk
 from ..languages import TARGET_ORDER, get
 from . import theme
 from .display import DisplayWindow
-from .layout import MAX_HISTORY, level_fraction, ordered_texts
+from .layout import MAX_HISTORY, level_fraction, ordered_texts, wrap_width
 
 if TYPE_CHECKING:
     from ..config import Settings
@@ -35,7 +35,8 @@ class App(ctk.CTk):
         self._current_seq: int | None = None
         self._local_seq = 0
         self.display: DisplayWindow | None = None
-        self._sticky_status = False
+        self._quota_notice = ""          # 한도 초과 안내는 앱을 끌 때까지 계속 보인다
+        self._stopped = threading.Event()  # 녹음 멈춤이 끝났다는 표시 (작업 스레드 → _poll)
 
         ctk.set_appearance_mode("light")
         self.title("석파고 SukPaGo")
@@ -125,7 +126,7 @@ class App(ctk.CTk):
                              border_color=theme.BORDER)
 
     def _rewrap(self, event) -> None:
-        width = max(200, event.width - 8)
+        width = wrap_width(event.width, ctk.ScalingTracker.get_widget_scaling(self))
         for label in (self.ko, *self.lines.values()):
             label.configure(wraplength=width)
 
@@ -156,8 +157,9 @@ class App(ctk.CTk):
             self._sync_live_button()
 
     def _stop_live(self) -> None:
+        # 작업 스레드에서는 Tk를 건드리지 않는다. 끝났다는 표시만 남기고 _poll이 버튼을 고친다.
         self.pipeline.stop_live()
-        self.after(0, self._sync_live_button)
+        self._stopped.set()
 
     def _sync_live_button(self) -> None:
         if self.pipeline.live:
@@ -233,6 +235,9 @@ class App(ctk.CTk):
     # ---- 이벤트 그리기 ----
 
     def _poll(self) -> None:
+        if self._stopped.is_set():
+            self._stopped.clear()
+            self._sync_live_button()
         try:
             while True:
                 self.handle(self.pipeline.events.get_nowait())
@@ -247,8 +252,7 @@ class App(ctk.CTk):
             self.partial.configure(text=ev.text)
         elif kind == "Final":
             self.partial.configure(text="")
-            if not self._sticky_status:  # 한도 초과 안내는 계속 보이고, 나머지 안내는 다음 문장에서 지운다
-                self.status.configure(text="")
+            self.status.configure(text=self._quota_notice)  # 나머지 안내는 다음 문장에서 지운다
             self._new_sentence(ev.seq, ev.ko)
         elif kind == "Translation":
             self._add_translation(ev.seq, ev.lang, ev.text)
@@ -256,8 +260,10 @@ class App(ctk.CTk):
             self.mic_bar.set(level_fraction(ev.dbfs))
             self.mic_bar.configure(progress_color=theme.MIC_COLORS.get(ev.state, theme.MUTED))
         elif kind == "Status":
-            self.status.configure(text=ev.message)
-            self._sticky_status = ev.kind == "quota"
+            if ev.kind == "quota":
+                self._quota_notice = ev.message
+            text = ev.message if ev.kind == "quota" or not self._quota_notice else f"{self._quota_notice} · {ev.message}"
+            self.status.configure(text=text)
             if ev.kind == "mic_error":
                 self._sync_live_button()
 

@@ -68,3 +68,10 @@ def test_errors(status, raw):
     with pytest.raises(TranslateError) as e:
         MyMemoryTranslator(fetch=fetch).translate("x", "en")
     assert not isinstance(e.value, QuotaExceeded)
+
+
+@pytest.mark.parametrize("raw", [b"null", b"[]", b'"text"', json.dumps({"responseStatus": 200, "responseData": "x"}).encode()])
+def test_non_object_json_is_translate_error(raw):
+    fetch, _ = fake(raw=raw)
+    with pytest.raises(TranslateError):
+        MyMemoryTranslator(fetch=fetch).translate("x", "en")

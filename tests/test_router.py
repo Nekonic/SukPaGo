@@ -86,3 +86,30 @@ def test_plain_error_only_affects_that_request():
     online.fail = None
     assert r.translate("둘", "zh", online=True) == RouteResult("MyMemory:zh:둘", "MyMemory", False)
     assert len(online.calls) == 2
+
+
+class Unloadable(Eng):
+    def __init__(self, name):
+        super().__init__(name)
+        self.unloaded = 0
+
+    def unload(self):
+        self.unloaded += 1
+
+
+def test_offline_engine_unloaded_after_idle():
+    now = [0.0]
+    nl = Unloadable("NL")
+    mm = ModelManager({"nllb": lambda: nl})
+    online = Eng("MyMemory", fail=TranslateError("down"))
+    r = TranslateRouter(online, mm, {"mn": "nllb", "zh": "nllb", "en": "nllb"},
+                        idle_unload_s=600, clock=lambda: now[0])
+    r.translate("a", "mn", online=True)          # 실패 → NLLB 로드
+    assert mm.active_name == "nllb"
+    online.fail = None
+    now[0] = 599
+    r.translate("b", "mn", online=True)
+    assert mm.active_name == "nllb"              # 아직 10분이 안 됨
+    now[0] = 601
+    r.translate("c", "mn", online=True)
+    assert mm.active_name is None and nl.unloaded == 1

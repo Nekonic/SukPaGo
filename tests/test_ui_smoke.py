@@ -212,3 +212,54 @@ def test_display_font_slider_and_buttons(app):
     assert d.font_px == 88 and round(d.slider.get()) == 88
     d._slide(500)
     assert d.font_px == 120
+
+
+def test_display_keeps_scroll_position_when_scrolled_up(app):
+    a, pipeline, _ = app
+    a.open_display()
+    for i in range(1, 60):
+        pipeline.events.put(Final(i, f"문장 {i}"))
+        pipeline.events.put(Translation(i, "mn", f"Монгол өгүүлбэр {i}"))
+    drain(a)
+    a.display.update()
+    a.display.text.yview_moveto(0.3)
+    a.display.update()
+    before = a.display.text.yview()[0]
+    assert 0.1 < before < 0.9
+    pipeline.events.put(Final(60, "새 문장"))
+    pipeline.events.put(Translation(60, "mn", "Шинэ өгүүлбэр"))
+    drain(a)
+    a.display.update()
+    assert abs(a.display.text.yview()[0] - before) < 0.05
+
+
+def test_stop_button_resyncs_via_poll_not_worker_thread(app):
+    import time as _t
+    a, pipeline, _ = app
+    a.toggle_live()
+    assert pipeline.live and a.live_button.cget("text") == "■ 멈추기"
+    called_from = []
+    real_after = a.after
+
+    def spy_after(ms, func=None, *args):
+        import threading as _th
+        called_from.append(_th.current_thread() is _th.main_thread())
+        return real_after(ms, func, *args)
+
+    a.after = spy_after
+    a.toggle_live()
+    deadline = _t.monotonic() + 2
+    while a.live_button.cget("text") != "● 녹음 시작" and _t.monotonic() < deadline:
+        drain(a)
+        _t.sleep(0.02)
+    assert a.live_button.cget("text") == "● 녹음 시작"
+    assert all(called_from)  # after()는 Tk 스레드에서만 불린다
+
+
+def test_quota_notice_survives_other_status(app):
+    a, pipeline, _ = app
+    pipeline.events.put(Status("quota", "오늘 번역 한도 초과"))
+    pipeline.events.put(Status("tts_error", "음성을 만들지 못했습니다"))
+    pipeline.events.put(Final(1, "문장"))
+    drain(a)
+    assert "오늘 번역 한도 초과" in a.status.cget("text")

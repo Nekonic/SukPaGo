@@ -56,7 +56,10 @@ def _stamp_path(path: Path) -> Path:
 def _write_stamp(path: Path, sha256: str) -> None:
     st = path.stat()
     record = {"size": st.st_size, "mtime_ns": st.st_mtime_ns, "sha256": sha256}
-    _stamp_path(path).write_text(json.dumps(record), "utf-8")
+    try:
+        _stamp_path(path).write_text(json.dumps(record), "utf-8")
+    except OSError:
+        pass  # 읽기 전용 폴더: 기록이 없으면 다음에 해시를 다시 계산할 뿐이다
 
 
 def _stamp_matches(path: Path, sha256: str, st) -> bool:

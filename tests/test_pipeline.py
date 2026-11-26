@@ -329,3 +329,23 @@ def test_shutdown_stops_threads_within_1s():
         t.join(timeout=max(0.0, 1.0 - (time.monotonic() - t0)))
     assert time.monotonic() - t0 < 1.0
     assert not any(t.is_alive() for t in threads)
+
+
+class CrashingRecognizer(FakeRecognizer):
+    def accept(self, samples):
+        raise RuntimeError("모델 오류")
+
+
+def test_asr_crash_reports_and_stops_mic(pipes):
+    p, _, _, _, mics = pipes()
+    p._recognizer_factory = lambda: CrashingRecognizer([])
+    p.start_live()
+    feed(mics[0])
+    ev = next_event(p)
+    assert isinstance(ev, Status) and ev.kind == "mic_error"
+    deadline = time.monotonic() + TIMEOUT
+    while p.live and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not p.live and mics[0].stopped
+    p.start_live()  # 다시 시작하면 새 마이크 하나만 열린다
+    assert len(mics) == 2 and mics[1].started

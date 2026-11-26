@@ -10,7 +10,7 @@ FILLERS = frozenset({"어", "음", "그", "네", "아", "예", "에", "저", "�
 LEADING_FILLERS = frozenset({"어", "음", "아", "에", "응"})
 _PUNCT = ".,?!。，？！…~"
 _REPEATED_WORD = re.compile(r"(?<!\S)(\S+)(?:\s+\1)+(?!\S)")
-_STUTTER = re.compile(r"(\S+?)(\S{2,})\2")
+_STUTTER = re.compile(r"([가-힣]+?)([가-힣]{2,})\2")  # 한글 말 더듬기만 (숫자·영어는 건드리지 않음)
 _SPLIT = re.compile(r"(?<=[.?!。？！])\s+|(?<=[요다죠까])\s+")
 
 

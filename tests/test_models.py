@@ -219,3 +219,16 @@ def test_lock_path_frozen_falls_back_to_package_data(tmp_path, monkeypatch):
     (pkg / "models.lock.json").write_text("{}", "utf-8")
     monkeypatch.setattr(models, "_PACKAGE_LOCK", pkg / "models.lock.json")
     assert models.lock_path() == pkg / "models.lock.json"
+
+
+def test_stamp_write_failure_does_not_fail_validation(tmp_path, monkeypatch):
+    data = b"model-bytes"
+    sha, size = blob(data)
+    f = tmp_path / "model.bin"
+    f.write_bytes(data)
+
+    def deny(*_a, **_k):
+        raise PermissionError("읽기 전용 폴더")
+
+    monkeypatch.setattr(models.Path, "write_text", deny)
+    assert models.is_valid(f, sha, size) is True

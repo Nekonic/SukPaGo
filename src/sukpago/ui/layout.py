@@ -14,6 +14,11 @@ def step_font(px: int, delta: int) -> int:
     return clamp_font(px + delta * FONT_STEP)
 
 
+def wrap_width(frame_px: int, scaling: float) -> int:
+    """CTkLabel의 wraplength는 화면 배율을 다시 곱하므로, 실제 픽셀 폭을 배율로 나눠 넘긴다."""
+    return max(200, int((frame_px - 8) / (scaling or 1.0)))
+
+
 def level_fraction(dbfs: float) -> float:
     """마이크 소리 크기(dBFS)를 막대 길이 0~1로. −60dBFS 이하는 0, 0dBFS는 1."""
     return max(0.0, min(1.0, (dbfs + 60.0) / 60.0))

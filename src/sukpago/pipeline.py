@@ -177,6 +177,20 @@ class Pipeline:
         self._asr_thread = None
 
     def _asr_loop(self, recognizer: Recognizer, audio_q: queue.Queue) -> None:
+        try:
+            self._asr_run(recognizer, audio_q)
+        except Exception as e:
+            # 인식 중 오류: 알리고, 이 실행의 마이크를 닫아 다시 시작할 수 있게 한다.
+            self._emit(Status("mic_error", f"음성 인식이 멈췄습니다: {e}"))
+            if self._audio_q is audio_q:
+                mic, self._mic, self._audio_q = self._mic, None, None
+                if mic is not None:
+                    try:
+                        mic.stop()
+                    except Exception:
+                        pass
+
+    def _asr_run(self, recognizer: Recognizer, audio_q: queue.Queue) -> None:
         assembler = self._assembler
         assert assembler is not None
         last_partial = ""

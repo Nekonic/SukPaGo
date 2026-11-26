@@ -49,7 +49,11 @@ class MyMemoryTranslator:
             data = json.loads(body)
         except ValueError as e:
             raise TranslateError("MyMemory 응답을 읽을 수 없습니다") from e
-        out = (data.get("responseData") or {}).get("translatedText") or ""
+        if not isinstance(data, dict):
+            raise TranslateError("MyMemory 응답 형식이 이상합니다")
+        rd = data.get("responseData")
+        out = rd.get("translatedText") if isinstance(rd, dict) else ""
+        out = out if isinstance(out, str) else ""
         if data.get("quotaFinished") or "MYMEMORY WARNING" in out.upper():
             raise QuotaExceeded("MyMemory 하루 한도를 넘었습니다")
         try:

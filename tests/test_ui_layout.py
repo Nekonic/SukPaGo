@@ -30,3 +30,10 @@ def test_level_fraction():
     assert level_fraction(-60) == 0.0
     assert level_fraction(-30) == 0.5
     assert level_fraction(3) == 1.0
+
+
+def test_wrap_width_divides_out_widget_scaling():
+    from sukpago.ui.layout import wrap_width
+    assert wrap_width(1000, 1.0) == 992
+    assert wrap_width(1250, 1.25) == 993
+    assert wrap_width(100, 1.0) == 200
