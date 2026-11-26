@@ -164,3 +164,31 @@ def test_run_py_uses_only_stdlib():
         elif isinstance(node, ast.ImportFrom) and node.module:
             names.add(node.module.split(".")[0])
     assert names <= set(sys.stdlib_module_names) | {"__future__"}
+
+
+def test_korean_output_survives_non_utf8_console(tmp_path):
+    env = {"PATH": "", "PYTHONIOENCODING": "cp1252", "SYSTEMROOT": "C:\\Windows"}
+    r = subprocess.run([sys.executable, str(ROOT / "run.py"), "bogus"], capture_output=True, env=env)
+    assert r.returncode == 2
+    assert "사용: python run.py" in r.stdout.decode("utf-8")
+
+
+def test_child_processes_get_utf8_env(run_mod, monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw.get("env") or {})
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(run_mod.subprocess, "run", fake_run)
+    run_mod._run(["x"])
+    assert seen.get("PYTHONUTF8") == "1"
+
+
+def test_package_import_forces_utf8_output():
+    env = {"PATH": "", "PYTHONIOENCODING": "cp1252", "SYSTEMROOT": "C:\\Windows",
+           "PYTHONPATH": str(ROOT / "src")}
+    r = subprocess.run([sys.executable, "-c", "import sukpago; print('한글 출력')"],
+                       capture_output=True, env=env)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.decode("utf-8").strip() == "한글 출력"

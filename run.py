@@ -57,7 +57,7 @@ def ensure_uv():
         return uv
     print("uv가 없어 pip로 설치합니다.", flush=True)
     try:
-        subprocess.run([sys.executable, "-m", "pip", "install", "--user", "uv"], cwd=ROOT)
+        subprocess.run([sys.executable, "-m", "pip", "install", "--user", "uv"], cwd=ROOT, env=_utf8_env())
     except OSError:
         pass
     uv = find_uv()
@@ -66,8 +66,22 @@ def ensure_uv():
     return uv
 
 
+def _safe_output():
+    """출력은 항상 UTF-8로 한다(영문 Windows의 cp1252 등에서 한글 출력이 죽지 않게)."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
+def _utf8_env():
+    return dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+
+
 def _run(cmd):
-    return subprocess.run(cmd, cwd=ROOT).returncode
+    # 하위 파이썬(모델 받기, 음성 만들기)도 한글을 출력하므로 UTF-8로 맞춘다.
+    return subprocess.run(cmd, cwd=ROOT, env=_utf8_env()).returncode
 
 
 def main(argv=None):
@@ -113,6 +127,7 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    _safe_output()
     try:
         sys.exit(main())
     except KeyboardInterrupt:

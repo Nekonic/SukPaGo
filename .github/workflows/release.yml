@@ -11,6 +11,8 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
@@ -23,11 +25,8 @@ jobs:
           path: models
           key: models-${{ hashFiles('tools/models.lock.json') }}
 
-      - name: 환경·모델·고정 문장 음성 준비 (run.py 검증 겸)
+      - name: 환경·모델·고정 문장 음성 준비
         run: python run.py setup
-
-      - name: 스모크 테스트 (실제 모델, 최대 메모리 2GB)
-        run: uv run python tools/smoke.py --max-mb 2048
 
       - name: exe 빌드
         run: uv run pyinstaller --noconfirm --clean packaging/sukpago.spec

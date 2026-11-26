@@ -150,7 +150,7 @@ def fetch_model(name: str, spec: dict, root: Path, opener=None,
     archive = spec.get("archive")
     if archive:
         stamp = target / ".archive-sha256"
-        if stamp.is_file() and stamp.read_text().strip() == archive["sha256"]:
+        if stamp.is_file() and stamp.read_text("utf-8").strip() == archive["sha256"]:
             print("  있음  (압축 해제됨)")
             return new
         tmp = root / f"{name}.tar.bz2"
@@ -159,7 +159,7 @@ def fetch_model(name: str, spec: dict, root: Path, opener=None,
         extract_stripped(tmp, target)
         tmp.unlink()
         _stamp_path(tmp).unlink(missing_ok=True)
-        stamp.write_text(archive["sha256"])
+        stamp.write_text(archive["sha256"], "utf-8")
     return new
 
 

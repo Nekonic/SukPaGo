@@ -233,3 +233,6 @@ assets/phrases/*.mp3
 
 # macOS
 .DS_Store
+
+# exe 빌드 설정은 커밋한다
+!packaging/sukpago.spec

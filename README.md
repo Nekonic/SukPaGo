@@ -44,8 +44,11 @@ GitHub Releases의 `SukPaGo-<버전>-win64.zip`을 받아 압축을 풀고 `SukP
 
 ```
 uv sync
-uv run pytest
+uv run pytest                                # 단위 테스트
+uv run python tools/smoke.py --max-mb 2048   # 실제 모델로 확인
 ```
+
+- 테스트는 내 컴퓨터에서 돌립니다. GitHub에서는 `v`로 시작하는 태그를 올리면 Windows exe만 만들어 Release에 붙입니다.
 
 - 설계 문서: `docs/superpowers/specs/2026-11-24-sukpago-design.md`
 - 외부 구성 요소와 라이선스: `THIRD_PARTY_NOTICES.txt`
