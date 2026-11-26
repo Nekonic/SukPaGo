@@ -263,3 +263,23 @@ def test_quota_notice_survives_other_status(app):
     pipeline.events.put(Final(1, "문장"))
     drain(a)
     assert "오늘 번역 한도 초과" in a.status.cget("text")
+
+
+def test_narrow_saved_window_still_shows_every_phrase_button():
+    from sukpago import phrases
+    from sukpago.ui.app import App
+
+    settings = FakeSettings()
+    settings.main_geometry = "700x500"
+    try:
+        a = App(FakePipeline(), settings, Glossary(), phrases_api=phrases, config_api=FakeConfig())
+    except tkinter.TclError as e:
+        pytest.skip(f"화면 없음: {e}")
+    try:
+        a.update()
+        last = a.phrase_buttons[-1]
+        assert len(a.phrase_buttons) == 5
+        assert all(b.winfo_width() >= b.winfo_reqwidth() for b in a.phrase_buttons)
+        assert last.winfo_rootx() + last.winfo_width() <= a.winfo_rootx() + a.winfo_width()
+    finally:
+        a.destroy()

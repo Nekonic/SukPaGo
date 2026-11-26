@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import queue
 import threading
+import tkinter
 from typing import TYPE_CHECKING
 
 import customtkinter as ctk
@@ -43,6 +44,9 @@ class App(ctk.CTk):
         self.geometry(settings.main_geometry or "980x560")
         self.attributes("-topmost", True)
         self._build()
+        # 빠른 문장 버튼이 하나도 잘리지 않을 만큼은 좁아지지 않게 한다(저장된 창 크기가 더 좁아도).
+        self.update_idletasks()
+        tkinter.Tk.wm_minsize(self, self._phrase_row.winfo_reqwidth() + 32, 0)
         self.protocol("WM_DELETE_WINDOW", self.quit_app)
         self.after(POLL_MS, self._poll)
 
@@ -92,6 +96,7 @@ class App(ctk.CTk):
 
         buttons = ctk.CTkFrame(self, fg_color=theme.BG)
         buttons.pack(fill="x", padx=16, pady=6)
+        self._phrase_row = buttons
         self.phrase_buttons = []
         for phrase in self._phrases_api.load_all():
             b = ctk.CTkButton(buttons, text=phrase.ko, height=52, fg_color=theme.BUTTON,
