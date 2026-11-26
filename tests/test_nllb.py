@@ -46,7 +46,8 @@ def test_request_shape_and_prefix_stripped():
     assert kw["target_prefix"] == [["khk_Cyrl"]]
     assert kw["beam_size"] == 2
     assert kw["no_repeat_ngram_size"] == 3
-    assert kw["repetition_penalty"] == 1.2
+    assert kw["length_penalty"] == 1.5 and kw["disable_unk"] is True
+    assert "repetition_penalty" not in kw
     assert kw["max_decoding_length"] == 2 * 2 + 16
 
 
@@ -84,3 +85,43 @@ def test_real_model(model_path):
 def test_real_1_3b_models(model_path, folder):
     out = NllbTranslator(model_path(folder)).translate("집중하세요.", "en").lower()
     assert "focus" in out or "concentrat" in out
+
+
+class MultiTr:
+    def __init__(self):
+        self.calls = []
+
+    def translate_batch(self, src, **kw):
+        self.calls.append((src, kw))
+        return [FakeResult([p[0], "out", p[0]]) for p in kw["target_prefix"]]
+
+
+def test_translate_many_one_batch_call_per_language_prefix():
+    tr = MultiTr()
+    t = NllbTranslator(Path("m"), loader=lambda d, n: (FakeSp(), tr))
+    out = t.translate_many("집중 하세요", ["mn", "zh", "en"])
+    assert out == {"mn": "out khk_Cyrl", "zh": "out zho_Hans", "en": "out eng_Latn"}
+    assert len(tr.calls) == 1
+    src, kw = tr.calls[0]
+    assert src == [["kor_Hang", "집중", "하세요", "</s>"]] * 3
+    assert kw["target_prefix"] == [["khk_Cyrl"], ["zho_Hans"], ["eng_Latn"]]
+
+
+def test_engine_name_follows_model_folder():
+    assert NllbTranslator(Path("models/nllb-1.3b")).name == "NLLB-1.3B"
+    assert NllbTranslator(Path("models/nllb-600m")).name == "NLLB-600M"
+
+
+class OneEmptyTr(MultiTr):
+    def translate_batch(self, src, **kw):
+        self.calls.append((src, kw))
+        return [FakeResult([p[0]] if p[0] == "zho_Hans" else [p[0], "ok"]) for p in kw["target_prefix"]]
+
+
+def test_one_empty_language_does_not_fail_the_others():
+    t = NllbTranslator(Path("m"), loader=lambda d, n: (FakeSp(), OneEmptyTr()))
+    out = t.translate_many("네", ["mn", "zh", "en"])
+    assert out["mn"] == "ok" and out["en"] == "ok"
+    assert isinstance(out["zh"], TranslateError)
+    with pytest.raises(TranslateError):
+        t.translate("네", "zh")

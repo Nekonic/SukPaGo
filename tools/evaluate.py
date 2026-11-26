@@ -60,12 +60,12 @@ def run_asr(rec, samples: np.ndarray) -> dict:
         for ev in rec.accept(samples[i:i + STEP]):
             if ev.kind == "final":
                 finals.append(ev.text)
-                sentences += asm.feed(ev.text, ev.t)
+                sentences += asm.feed(ev.text, ev.t, cut=ev.forced)
         sentences += asm.tick((i + STEP) / SAMPLE_RATE)
     for ev in rec.finish():
         if ev.kind == "final":
             finals.append(ev.text)
-            sentences += asm.feed(ev.text, ev.t)
+            sentences += asm.feed(ev.text, ev.t, cut=ev.forced)
     sentences += asm.flush()
     return {"finals": finals, "sentences": sentences,
             "compute_s": time.perf_counter() - t0, "audio_s": len(samples) / SAMPLE_RATE}

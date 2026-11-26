@@ -51,7 +51,8 @@ class FakeRecognizer:
 
     def accept(self, samples):
         if self.script:
-            return [AsrEvent(kind, text, 0.0) for kind, text in self.script.pop(0)]
+            # (종류, 글자) 또는 (종류, 글자, 강제 끊김)
+            return [AsrEvent(e[0], e[1], 0.0, *e[2:]) for e in self.script.pop(0)]
         return []
 
     def finish(self):
@@ -358,7 +359,7 @@ class SlowRouter(FakeRouter):
 
 
 def test_languages_are_translated_in_parallel_but_emitted_in_order(pipes):
-    p, *_, mics = pipes([[("final", "세 언어로 동시에 번역할 문장")]], router=SlowRouter(),
+    p, *_, mics = pipes([[("final", "세 언어로 동시에 번역할 문장입니다")]], router=SlowRouter(),
                         settings=FakeSettings(langs=["mn", "zh", "en"]))
     p.start_live()
     feed(mics[0])
@@ -367,3 +368,171 @@ def test_languages_are_translated_in_parallel_but_emitted_in_order(pipes):
     langs = [next_event(p).lang for _ in range(3)]
     assert langs == ["mn", "zh", "en"]
     assert time.monotonic() - t0 < 0.75  # 차례로 하면 0.9초 이상
+
+
+
+class BatchRouter(FakeRouter):
+    def __init__(self):
+        super().__init__(reason="offline")
+        self.many = []
+
+    def translate_offline_many(self, text, langs):
+        self.many.append((text, list(langs)))
+        return {lang: FakeResult(f"{lang}:{text}", "fake", False, "offline") for lang in langs}
+
+
+def test_offline_translates_all_languages_in_one_call(pipes):
+    router = BatchRouter()
+    p, *_, mics = pipes([[("final", "오프라인으로 묶어서 번역할 문장입니다")]], router=router,
+                        settings=FakeSettings(langs=["mn", "zh", "en"], online=False))
+    p.start_live()
+    feed(mics[0])
+    assert isinstance(next_event(p), Final)
+    assert [next_event(p).lang for _ in range(3)] == ["mn", "zh", "en"]
+    assert router.many == [("오프라인으로 묶어서 번역할 문장입니다", ["mn", "zh", "en"])]
+    assert router.calls == []
+
+
+def test_clause_is_translated_before_the_final(pipes):
+    script = [[("partial", "내용은 크게 달라지지 않았다고 봅니다")],
+              [("partial", "내용은 크게 달라지지 않았다고 봅니다 이제")],
+              [("partial", "내용은 크게 달라지지 않았다고 봅니다 이제 뒤에")],
+              [("final", "내용은 크게 달라지지 않았다고 봅니다 이제 뒤에 실습은 바뀌어요")]]
+    p, *_, mics = pipes(script, settings=FakeSettings(langs=["mn"]))
+    p.start_live()
+    for _ in script:
+        feed(mics[0])
+    finals = []
+    while len(finals) < 2:
+        ev = next_event(p)
+        if isinstance(ev, Final):
+            finals.append(ev.ko)
+    assert finals == ["내용은 크게 달라지지 않았다고 봅니다", "이제 뒤에 실습은 바뀌어요"]
+
+
+class QuotaRouter(BatchRouter):
+    quota_exceeded = True
+
+    def translate_offline_many(self, text, langs, **kw):
+        self.many.append((text, list(langs), kw))
+        return {lang: FakeResult(f"{lang}:{text}", "fake", True, "quota") for lang in langs}
+
+
+def test_after_quota_online_mode_also_batches_offline(pipes):
+    router = QuotaRouter()
+    p, *_, mics = pipes([[("final", "한도를 넘긴 뒤에 번역할 문장입니다")]], router=router,
+                        settings=FakeSettings(langs=["mn", "zh", "en"], online=True))
+    p.start_live()
+    feed(mics[0])
+    assert isinstance(next_event(p), Final)
+    langs = [e.lang for e in (next_event(p) for _ in range(4)) if isinstance(e, Translation)]
+    assert langs == ["mn", "zh", "en"]
+    assert router.many == [("한도를 넘긴 뒤에 번역할 문장입니다", ["mn", "zh", "en"], {"fell_back": True, "reason": "quota"})]
+    assert router.calls == []
+
+
+class PartlyFailingRouter(BatchRouter):
+    def translate_offline_many(self, text, langs, **kw):
+        out = super().translate_offline_many(text, langs)
+        out["zh"] = RuntimeError("빈 번역")
+        return out
+
+
+def test_offline_one_language_failure_keeps_others(pipes):
+    p, *_, mics = pipes([[("final", "한 언어만 실패하는 문장입니다")]], router=PartlyFailingRouter(),
+                        settings=FakeSettings(langs=["mn", "zh", "en"], online=False))
+    p.start_live()
+    feed(mics[0])
+    assert isinstance(next_event(p), Final)
+    evs = [next_event(p) for _ in range(3)]
+    assert [e.lang for e in evs if isinstance(e, Translation)] == ["mn", "en"]
+    assert any(isinstance(e, Status) and "zh" in e.message for e in evs)
+
+
+
+def test_glossary_applied_before_clause_split(pipes):
+    from sukpago.text.glossary import Glossary, Rule
+    script = [[("partial", "그래서 이번 시간에 데이터 분석할 때는 판다 스를")],
+              [("partial", "그래서 이번 시간에 데이터 분석할 때는 판다 스를 많이")],
+              [("final", "그래서 이번 시간에 데이터 분석할 때는 판다 스를 많이 씁니다")]]
+    p, *_, mics = pipes(script, settings=FakeSettings(langs=["mn"]),
+                        glossary=Glossary([Rule("판다 스", "pandas")]))
+    p.start_live()
+    for _ in script:
+        feed(mics[0])
+    ev = next_event(p)
+    while not isinstance(ev, Final):
+        ev = next_event(p)
+    assert ev.ko == "그래서 이번 시간에 데이터 분석할 때는 pandas를 많이 씁니다"
+
+
+def test_stop_after_early_clause_flushes_the_rest(pipes):
+    script = [[("partial", "내용은 크게 달라지지 않았다고 봅니다 이제")],
+              [("partial", "내용은 크게 달라지지 않았다고 봅니다 이제 뒤에")]]
+    p, *_, mics = pipes(script, settings=FakeSettings(langs=["mn"]))
+    rec = p._recognizer_factory()
+    rec.finish = lambda: [AsrEvent("final", "내용은 크게 달라지지 않았다고 봅니다 이제 뒤에 실습", 3.0)]
+    p.start_live()
+    for _ in script:
+        feed(mics[0])
+    first = next_event(p)
+    while not isinstance(first, Final):
+        first = next_event(p)
+    assert first.ko == "내용은 크게 달라지지 않았다고 봅니다"
+    p.stop_live()
+    ev = next_event(p)
+    while not isinstance(ev, Final):
+        ev = next_event(p)
+    assert ev.ko == "이제 뒤에 실습"
+
+
+
+def test_glossary_change_mid_utterance_does_not_lose_text(pipes):
+    g = Glossary()
+    script = [[("partial", "오늘은 에이 피 아이를 직접 호출해 봅니다 그리고 결과를")],
+              [("partial", "오늘은 에이 피 아이를 직접 호출해 봅니다 그리고 결과를 받아서")],
+              [("final", "오늘은 에이 피 아이를 직접 호출해 봅니다 그리고 결과를 받아서 화면에 보여줍니다")]]
+    p, *_, mics = pipes(script, settings=FakeSettings(langs=["mn"]), glossary=g)
+    p.start_live()
+    feed(mics[0]); feed(mics[0])
+    finals = []
+    while not finals:
+        ev = next_event(p)
+        if isinstance(ev, Final):
+            finals.append(ev.ko)
+    g.add("에이피아이", "API")
+    p.set_glossary(g)
+    feed(mics[0])
+    while len(finals) < 2:
+        ev = next_event(p)
+        if isinstance(ev, Final):
+            finals.append(ev.ko)
+    assert finals[1].startswith("그리고 결과를 받아서")
+
+
+def _finals_of(p, n):
+    out = []
+    while len(out) < n:
+        ev = next_event(p)
+        if isinstance(ev, Final):
+            out.append(ev.ko)
+    return out
+
+
+@pytest.mark.parametrize("forced", [True, False])
+def test_glossary_term_split_across_pieces_is_fixed_once(pipes, forced):
+    script = [[("final", "오늘은 우리가 수업에서 자바", forced)],
+              [("final", "스크립트로 화면을 만들어 볼 거예요")]]
+    p, *_, mics = pipes(script, settings=FakeSettings(langs=["mn"]),
+                        glossary=Glossary([Rule("자바", "자바스크립트")]))
+    p.start_live()
+    feed(mics[0]); feed(mics[0])
+    assert _finals_of(p, 1) == ["오늘은 우리가 수업에서 자바 스크립트로 화면을 만들어 볼 거예요"]
+
+
+def test_copula_after_forced_cut_is_glued(pipes):
+    p, *_, mics = pipes([[("final", "중요한 것은 독자의 관점", True)], [("final", "입니다 그래서 이렇게 씁니다")]],
+                        settings=FakeSettings(langs=["mn"]))
+    p.start_live()
+    feed(mics[0]); feed(mics[0])
+    assert _finals_of(p, 1) == ["중요한 것은 독자의 관점입니다 그래서 이렇게 씁니다"]

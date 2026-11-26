@@ -66,6 +66,35 @@ class TranslateRouter:
             self._last_offline = self._clock()
         return RouteResult(out, engine.name, fell_back, reason)
 
+    def translate_offline_many(self, text: str, langs: list[str], *, fell_back: bool = False,
+                               reason: str = "offline") -> dict[str, RouteResult | Exception]:
+        """켜진 언어를 오프라인 모델별로 묶어 한 번에 번역한다. 실패한 언어는 그 자리에 예외를 둔다."""
+        groups: dict[str, list[str]] = {}
+        for lang in langs:
+            groups.setdefault(self._offline_for[lang], []).append(lang)
+        out: dict[str, RouteResult | Exception] = {}
+        with self._lock:
+            for name, group in groups.items():
+                try:
+                    engine = self._models.get(name)
+                    many = getattr(engine, "translate_many", None)
+                    if many is not None:
+                        texts = many(text, group)
+                    else:
+                        texts = {}
+                        for lang in group:
+                            try:
+                                texts[lang] = engine.translate(text, lang)
+                            except Exception as e:
+                                texts[lang] = e
+                except Exception as e:
+                    texts = {lang: e for lang in group}
+                for lang in group:
+                    t = texts[lang]
+                    out[lang] = t if isinstance(t, Exception) else RouteResult(t, engine.name, fell_back, reason)
+            self._last_offline = self._clock()
+        return out
+
     def _unload_if_idle(self) -> None:
         """온라인이 잘 될 때, 대체 모델을 오래(기본 10분) 안 썼으면 메모리에서 내린다."""
         if self._idle_unload_s is None:

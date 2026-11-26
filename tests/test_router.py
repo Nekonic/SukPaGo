@@ -113,3 +113,30 @@ def test_offline_engine_unloaded_after_idle():
     now[0] = 601
     r.translate("c", "mn", online=True)
     assert mm.active_name is None and nl.unloaded == 1
+
+
+class ManyEng(Eng):
+    def __init__(self, name):
+        super().__init__(name)
+        self.many_calls = []
+
+    def translate_many(self, text, langs):
+        self.many_calls.append((text, list(langs)))
+        return {lang: f"{self.name}:{lang}:{text}" for lang in langs}
+
+
+def test_offline_many_batches_per_model():
+    nl, hy = ManyEng("NL"), Eng("Hy")
+    r = router(Eng("MyMemory"), {"hymt": hy, "nllb": nl})
+    out = r.translate_offline_many("안녕", ["mn", "zh", "en"])
+    assert out["mn"] == RouteResult("NL:mn:안녕", "NL", False, "offline")
+    assert out["en"] == RouteResult("Hy:en:안녕", "Hy", False, "offline")
+    assert nl.many_calls == [("안녕", ["mn"])]
+    assert hy.calls == [("안녕", "zh"), ("안녕", "en")]  # translate_many가 없으면 하나씩
+
+
+def test_offline_many_keeps_other_languages_when_one_fails():
+    r = router(Eng("MyMemory"), {"hymt": Eng("Hy", fail=TranslateError("y")), "nllb": ManyEng("NL")})
+    out = r.translate_offline_many("안녕", ["mn", "zh"], fell_back=True, reason="quota")
+    assert out["mn"] == RouteResult("NL:mn:안녕", "NL", True, "quota")
+    assert isinstance(out["zh"], TranslateError)

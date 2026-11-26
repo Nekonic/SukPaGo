@@ -36,3 +36,23 @@ def test_special_characters_are_literal():
 def test_json_roundtrip():
     g = Glossary([Rule("a b", "AB")])
     assert Glossary.from_json(g.to_json()).rules == g.rules
+
+
+
+def test_apply_twice_is_same_as_once():
+    g = Glossary([Rule("자바", "자바스크립트")])
+    once = g.apply("자바 문법을 배워 보겠습니다")
+    assert once == "자바스크립트 문법을 배워 보겠습니다"
+    assert g.apply(once) == once
+
+
+
+def test_spaced_right_form_is_not_replaced_again():
+    g = Glossary([Rule("자바", "자바스크립트")])
+    assert g.apply("자바 스크립트 문법") == "자바 스크립트 문법"
+
+
+def test_spacing_only_rule_still_applies_and_is_idempotent():
+    g = Glossary([Rule("쿠버 네티스", "쿠버네티스")])
+    assert g.apply("쿠버 네티스를 설치") == "쿠버네티스를 설치"
+    assert g.apply("쿠버네티스를 설치") == "쿠버네티스를 설치"

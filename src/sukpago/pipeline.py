@@ -17,6 +17,7 @@ from .asr.base import Recognizer
 from .asr.mic import classify, level
 from .languages import TARGET_ORDER
 from .text.assembler import SentenceAssembler
+from .text.clauses import ClauseCommitter
 from .text.glossary import Glossary
 
 if TYPE_CHECKING:
@@ -85,7 +86,7 @@ class Pipeline:
         self._player = player
         self._mic_factory = mic_factory
         self._settings = settings
-        self._glossary = glossary
+        self._glossary = Glossary(glossary.rules)  # 화면이 고치는 객체와 분리(set_glossary로만 바뀜)
         self._clock = clock
         self._audio_path = audio_path or _default_audio_path
 
@@ -132,6 +133,7 @@ class Pipeline:
             self._settings.online = bool(online)
 
     def set_glossary(self, g: Glossary) -> None:
+        g = Glossary(g.rules)  # 화면이 같은 객체를 고쳐도 인식 스레드가 쓰는 규칙이 중간에 바뀌지 않게 복사
         with self._lock:
             self._glossary = g
             if self._assembler is not None:
@@ -196,6 +198,8 @@ class Pipeline:
     def _asr_run(self, recognizer: Recognizer, audio_q: queue.Queue) -> None:
         assembler = self._assembler
         assert assembler is not None
+        # 용어 고치기는 조각을 합친 뒤 assembler가 한 번만 한다. 절은 고칠 낱말 한가운데서 자르지 않는다.
+        clauses = ClauseCommitter(protect=lambda t: assembler.glossary.wrong_spans(t))
         last_partial = ""
         last_tick = self._clock()
         last_level = None
@@ -207,9 +211,18 @@ class Pipeline:
                     if ev.text and ev.text != last_partial:
                         last_partial = ev.text
                         self._emit(Partial(ev.text))
+                        assembler.still_talking(self._clock())
+                        early = clauses.partial(ev.text)  # 말하는 도중 먼저 번역
+                        if not early and assembler.waiting_for_cut:
+                            head = clauses.take_head()  # 끊긴 앞 조각에 이어지는 첫 어절
+                            early = [head] if head else []
+                        for clause in early:
+                            self._finals(assembler.feed_now(clause), "live")
                 elif ev.kind == "final":
                     last_partial = ""
-                    self._finals(assembler.feed(ev.text, self._clock()), "live")
+                    rest = clauses.final(ev.text)
+                    if rest:
+                        self._finals(assembler.feed(rest, self._clock(), cut=getattr(ev, "forced", False)), "live")
 
         while not self._closed:
             try:
@@ -268,13 +281,9 @@ class Pipeline:
             online = self._online()
             fallback_reason: str | None = None
             langs = self._langs()
-            futures = [self._lang_pool.submit(self._router.translate, ko, lang, online=online)
-                       for lang in langs]
-            for lang, fut in zip(langs, futures):  # 끝난 순서와 상관없이 정해진 순서로 낸다
-                try:
-                    r = fut.result()
-                except Exception as e:
-                    self._emit(Status("info", f"번역하지 못했습니다({lang}): {e}"))
+            for lang, r in self._translate_all(ko, langs, online):  # 정해진 순서로 낸다
+                if isinstance(r, Exception):
+                    self._emit(Status("info", f"번역하지 못했습니다({lang}): {r}"))
                     continue
                 reason = getattr(r, "reason", None)
                 self._emit(Translation(seq, lang, r.text, r.engine, r.fell_back, reason))
@@ -288,6 +297,28 @@ class Pipeline:
                 self._emit(Status("fallback", f"오프라인으로 전환됨 ({fallback_reason})"))
             if self._trans_q.empty():
                 self._delayed = False
+
+    def _translate_all(self, ko: str, langs: list[str], online: bool) -> list[tuple[str, Any]]:
+        """켜진 언어의 (언어, 결과 또는 예외) 목록. 온라인은 언어별로 동시에, 오프라인은 한 번에 묶어 번역한다."""
+        many = getattr(self._router, "translate_offline_many", None)
+        quota = bool(getattr(self._router, "quota_exceeded", False))
+        if many is not None and langs and (not online or quota):
+            # 오프라인 모드, 또는 오늘 한도를 넘겨 어차피 오프라인으로 갈 때는 한 번에 묶는다.
+            kw = {"fell_back": True, "reason": "quota"} if online else {}
+            try:
+                results = many(ko, langs, **kw)
+                return [(lang, results[lang]) for lang in langs]
+            except Exception as e:
+                return [(lang, e) for lang in langs]
+        futures = [self._lang_pool.submit(self._router.translate, ko, lang, online=online)
+                   for lang in langs]
+        out: list[tuple[str, Any]] = []
+        for lang, fut in zip(langs, futures):
+            try:
+                out.append((lang, fut.result()))
+            except Exception as e:
+                out.append((lang, e))
+        return out
 
     # ---- 음성 ----
 

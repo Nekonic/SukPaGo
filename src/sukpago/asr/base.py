@@ -17,6 +17,7 @@ class AsrEvent:
     kind: Literal["partial", "final"]
     text: str
     t: float
+    forced: bool = False  # final이 최대 발화 길이에 걸려 강제로 끊긴 것인가(문장이 안 끝났을 수 있음)
 
 
 class Recognizer(Protocol):
